@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""ප්‍රකෘති AI — Chat Server v0.7.
-NEW: APPAMADA notes, /karma command, Constitution Lock on LLM calls."""
+"""ප්‍රකෘති AI — Chat Server v0.7.1.
+Gemini (free) → OpenRouter failover · APPAMADA · KARMA_CODE · Constitution Lock."""
 import os, sys
 
 try:
@@ -18,6 +18,7 @@ from sila.engine import validate_execution, detect_language, SYSTEM_ID
 from sila.judge import judge
 from sila.handshake import MANIFEST, manifest_fingerprint
 from sila.lock import system_prompt as locked_system_prompt, check_messages
+from sila import gemini
 from sila.appamada import note_for
 from sila import karma as karma_lib
 
@@ -37,8 +38,8 @@ def _session(cid):
     return SESSIONS[cid]
 
 OFFLINE_STUBS = {
-    "si": "(offline demo) ඔබේ ප්‍රශ්නය: “{q}” — මෙතනට සැබෑ LLM පිළිතුර එනවා. Real mode: OPENAI_API_KEY set කරන්න.",
-    "en": "(offline demo) Your question: “{q}” — a real LLM answer will appear here. Real mode: set OPENAI_API_KEY.",
+    "si": "(offline demo) ඔබේ ප්‍රශ්නය: “{q}” — මෙතනට සැබෑ LLM පිළිතුර එනවා. Key set කරලා restart කරන්න.",
+    "en": "(offline demo) Your question: “{q}” — a real LLM answer will appear here. Set a key and restart.",
     "ta": "(offline demo) உங்கள் கேள்வி: “{q}” — உண்மையான LLM பதில் இங்கே வரும்.",
 }
 LLM_DOWN = {
@@ -48,11 +49,8 @@ LLM_DOWN = {
 }
 
 def llm_chat(messages):
-    from openai import OpenAI
-    client = OpenAI()
-    return client.chat.completions.create(
-        model=os.environ.get("PRAKRUTHI_MODEL", "gpt-4o-mini"),
-        messages=messages).choices[0].message.content
+    from sila import gemini
+    return gemini.chat(messages)
 
 def _karma_listing():
     items = karma_lib.list_karma_code()
@@ -67,13 +65,14 @@ def _karma_listing():
 
 def chat_pipeline(prompt, client_id="default"):
     if not ENGINE_OK:
-        return {"success": False, "output": REFUSALS[detect_language(prompt)]["SAFE"],
-                "gate": {"precept": None, "lang": detect_language(prompt)}, "note": None}
+        lang = detect_language(prompt)
+        return {"success": False, "output": REFUSALS[lang]["SAFE"],
+                "gate": {"precept": None, "lang": lang}, "note": None}
     lang = detect_language(prompt)
     history = _session(client_id)
     def refusal(key):
         return REFUSALS.get(lang, REFUSALS["en"])[key]
-    # /karma command — local, offline-friendly
+    # /karma — local, offline-friendly
     if prompt.strip().lower() == "/karma":
         audit({"event": "OK", "input": "/karma", "src": "chat"})
         return {"success": True, "output": _karma_listing(),
@@ -94,7 +93,7 @@ def chat_pipeline(prompt, client_id="default"):
         return {"success": False, "output": refusal(v.get("precept") or 1),
                 "gate": {"precept": v.get("precept") or 1, "lang": lang}, "note": None}
     # 3) inference — Constitution Lock එකෙන් යනවා
-    online = bool(os.environ.get("OPENAI_API_KEY"))
+    online = gemini.online()
     if online:
         messages = ([{"role": "system", "content": SYSTEM_PROMPT}]
                     + history[-MAX_HISTORY * 2:]
@@ -158,7 +157,7 @@ def reset(r: Reset):
 @app.get("/manifest")
 def manifest():
     return {"manifest": MANIFEST, "fingerprint": manifest_fingerprint(),
-            "engine_ok": ENGINE_OK, "online": bool(os.environ.get("OPENAI_API_KEY"))}
+            "engine_ok": ENGINE_OK, "online": gemini.online()}
 
 @app.get("/", response_class=HTMLResponse)
 def home():
@@ -308,7 +307,7 @@ if __name__ == "__main__":
         ip = "127.0.0.1"
     finally:
         s.close()
-    print("🪷 ප්‍රකෘති AI Chat v0.7 — " + SYSTEM_ID)
+    print("🪷 ප්‍රකෘති AI Chat v0.7.1 — " + SYSTEM_ID)
     print("   PC:    http://127.0.0.1:8000")
     print("   Phone: http://" + ip + ":8000   (same Wi-Fi)")
     uvicorn.run(app, host="0.0.0.0", port=8000)
