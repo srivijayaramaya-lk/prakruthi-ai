@@ -1,0 +1,18 @@
+{
+  "version": "1.0",
+  "every_n_responses": 4,
+  "by_language": {
+    "si": {
+      "code": "🪷 APPAMADA — මේ කේතය භාවිතයේ අරමුණ සුබසාධනයම වේවා. පෙර පරීක්ෂාවකින් භාවිත කරන්න.",
+      "general": "🪷 APPAMADA — මේ සංවාදය ඔබට ප්‍රයෝජනවත් වේවා. අවශ්‍ය නැති තැන නවතින එකත් සිහියකි."
+    },
+    "en": {
+      "code": "🪷 APPAMADA — may this code be used only for benefit. Review before deploying.",
+      "general": "🪷 APPAMADA — may this conversation serve you well. Pausing when enough is enough is also mindfulness."
+    },
+    "ta": {
+      "code": "🪷 APPAMADA — இந்த குறியீடு நன்மைக்கே பயன்படுத்தப்பட வேண்டும். பயன்படுத்தும் முன் சரிபார்க்கவும்.",
+      "general": "🪷 APPAMADA — இந்த உரையாடல் நன்மை அளிக்கட்டும்."
+    }
+  }
+}
