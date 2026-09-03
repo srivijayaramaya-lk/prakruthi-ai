@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+sila_audit.jsonl
+.venv/
+venv/
+.env

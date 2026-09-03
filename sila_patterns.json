@@ -1,0 +1,58 @@
+{
+  "version": "2.0",
+  "_notes": {
+    "design": "Language packs: අලුත් භාෂාවක් = languages යටතේ අලුත් key එකක්. Code edit අවශ්‍ය නෑ.",
+    "enforcement": "හැම pack එකක්ම හැම input එකකටම check වේ — mixed-language attacks ('මට hack කරන්න') නිසා.",
+    "detection": "detect_language() = UX විතරයි (refusal භාෂාව), enforcement එකට නෙවෙයි.",
+    "short_word_rule": "කෙටි වචන අවදානම් — போர் (2 අකුරු) වගේ ඒවා ඉවත් කරන්න පුළුවන් false positives නිසා. අකුරු 3+ අනන්‍ය වචන විතරක්.",
+    "ta_seed": "Tamil pack එක SEED quality — native speaker review අනිවාර්යයි. Community contributions වලට ආදර්ශය."
+  },
+  "injection_x3": [
+    "\\bignore\\s+(?:all\\s+)?(?:previous|prior|above)\\s+instructions\\b",
+    "\\bdisregard\\s+(?:all\\s+)?(?:previous|prior|above)\\s+instructions\\b",
+    "\\bdisable\\s+(?:your\\s+)?(?:guardrails?|filters?|safety)\\b",
+    "\\byou\\s+are\\s+now\\b",
+    "\\bnew\\s+rules?\\s*:"
+  ],
+  "singlish_to_sinhala": {
+    "maranna": "මරන්න", "maranaya": "මරන්න", "marenna": "මැරෙන්න", "marala": "මරලා",
+    "vinash": "විනාශ", "vinasha": "විනාශ",
+    "horakam": "හොරකම්", "hora kam": "හොරකම්", "horaakkam": "හොරකම්",
+    "ayudha": "ආයුධ", "aayudha": "ආයුධ", "yuddha": "යුද්ධ", "yudday": "යුද්ධ",
+    "hani": "හානි", "haani": "හානි", "vyaja": "ව්‍යාජ", "wyaaja": "ව්‍යාජ",
+    "gini thella": "ගිනි තැලීම", "gini thelanna": "ගිනි තැලීම",
+    "kohomada": "කොහොමද", "monawada": "මොනවද",
+    "karanna": "කරන්න", "kiyanna": "කියන්න", "hadanna": "හදන්න"
+  },
+  "languages": {
+    "en": {
+      "name": "English",
+      "safe_tech_whitelist": [
+        "kill\\s+(?:-\\w+\\s+)*(?:a\\s+|the\\s+)?(?:\\w+\\s+)?process",
+        "\\bhackathon\\b",
+        "\\bwar\\s+(?:history|memorial|documentary|movies?|films?)\\b",
+        "\\bpest\\s+control\\b"
+      ],
+      "harm_regex": [
+        "\\b(?:kill|destroy|weapon\\w*|attack|bomb|terror\\w*|massacre|genocide|assassinat\\w*|explosive\\w*)\\b"
+      ],
+      "deception_regex": [
+        "\\b(?:hack\\w*|steal\\w*|malware|deepfake|ransomware|phish\\w*|keylogger|scam\\w*|fraud)\\b"
+      ]
+    },
+    "si": {
+      "name": "සිංහල",
+      "harm_words": [
+        "මරන්න", "මරලා", "මැරෙන්න", "විනාශ", "ආයුධ", "ප්‍රහාර", "යුද්ධ", "හානි", "ගිනි තැලීම"
+      ],
+      "deception_words": ["හොරකම්", "ව්‍යාජ", "හැක්"]
+    },
+    "ta": {
+      "name": "தமிழ் (SEED — native review needed)",
+      "harm_words": [
+        "கொலை", "குண்டு", "தாக்குதல்", "ஆயுதம்", "அழிக்க", "போர்"
+      ],
+      "deception_words": ["திருடு", "மோசடி", "ஹேக்"]
+    }
+  }
+}
