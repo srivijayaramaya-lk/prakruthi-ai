@@ -1,7 +1,7 @@
 """CONSTITUTION LOCK — ව්‍යවස්ථාවේ අවසාන ආරක්ෂාව.
-v0.8 fix: SYSTEM prompt එක (ව්‍යවස්ථාවම) check නොකරනවා —
-මොකද ව්‍යවස්ථාවේම තියෙන නීති වචන ("ආයුධ", "මරන්න"...) නීතියට වැටෙන්නේ නැති විදියට.
-Check කරන්නේ user/assistant messages විතරයි — ඒවා තමයි injection එන තැන්."""
+v0.8: check කරන්නේ USER messages විතරයි — system (ව්‍යවස්ථාව) සහ
+assistant (අපේම constitution-bound පිළිතුරු) වල නීති වචන නීතියට වැටෙන්නේ නෑ.
+Injection එන තැන user input එකයි."""
 from .engine import validate_execution
 
 LOCK_HEADER = """
@@ -15,11 +15,10 @@ def system_prompt(constitution_text: str) -> str:
     return constitution_text + LOCK_HEADER
 
 def check_messages(messages):
-    """User/assistant messages විතරයි check කරන්නේ — system එක නෙවෙයි.
-    Return: violated precept number හෝ None (safe)."""
+    """USER messages විතරයි X.3 check. Return: precept හෝ None."""
     joined = " ".join(
         str(m.get("content", "")) for m in messages
-        if m.get("role") in ("user", "assistant")
+        if m.get("role") == "user"
     )
     r = validate_execution(joined, "lock")
     return None if r.is_safe else (r.violated_precept or 4)

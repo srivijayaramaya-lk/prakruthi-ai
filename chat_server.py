@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""ප්‍රකෘති AI — Chat Server v0.7.1.
-Gemini (free) → OpenRouter failover · APPAMADA · KARMA_CODE · Constitution Lock."""
+"""ප්‍රකෘති AI — Chat Server v0.8.
+Gemini→OpenRouter failover · APPAMADA · KARMA_CODE · Constitution Lock
+· L2 referee on output gate (constitution-explanation false-positive fix)."""
 import os, sys
 
 try:
@@ -49,7 +50,6 @@ LLM_DOWN = {
 }
 
 def llm_chat(messages):
-    from sila import gemini
     return gemini.chat(messages)
 
 def _karma_listing():
@@ -92,13 +92,13 @@ def chat_pipeline(prompt, client_id="default"):
                "reason": v.get("reason"), "lang": lang, "src": "chat"})
         return {"success": False, "output": refusal(v.get("precept") or 1),
                 "gate": {"precept": v.get("precept") or 1, "lang": lang}, "note": None}
-    # 3) inference — Constitution Lock එකෙන් යනවා
+    # 3) inference — Constitution Lock එකෙන් යනවා (user messages විතරයි scan)
     online = gemini.online()
     if online:
         messages = ([{"role": "system", "content": SYSTEM_PROMPT}]
                     + history[-MAX_HISTORY * 2:]
                     + [{"role": "user", "content": prompt}])
-        violation = check_messages(messages)   # අවසාන දොරටුව
+        violation = check_messages(messages)
         if violation:
             audit({"event": "BLOCK", "layer": "lock", "input": prompt,
                    "precept": violation, "src": "chat"})
@@ -112,15 +112,21 @@ def chat_pipeline(prompt, client_id="default"):
                     "gate": {"precept": None, "lang": lang, "note_flag": "llm_down"}, "note": None}
     else:
         out = OFFLINE_STUBS.get(lang, OFFLINE_STUBS["en"]).format(q=prompt)
-    # 4) output gate
+    # 4) output gate — L1 suspicion + L2 semantic referee
+    #    (ව්‍යවස්ථාව/නීති පැහැදිලි කිරීම් false-positive නොවී යන්න; fail-closed)
     r2 = validate_execution(out, "L1-out")
     if not r2.is_safe:
-        audit({"event": "BLOCK", "layer": "L1-output",
-               "precept": r2.violated_precept, "src": "chat"})
-        return {"success": False,
-                "output": "🪷 [SILA] මගේ පිළිතුර තුළ අවශ්‍ය නැති දෙයක් තිබුණා — suppressed.",
-                "gate": {"precept": r2.violated_precept, "lang": lang}, "note": None}
-    audit({"event": "OK", "input": prompt, "src": "chat"})
+        v2 = judge(out)
+        if v2["verdict"] != "SAFE":
+            audit({"event": "BLOCK", "layer": "L1-output",
+                   "precept": r2.violated_precept, "src": "chat"})
+            return {"success": False,
+                    "output": "🪷 [SILA] මගේ පිළිතුර තුළ අවශ්‍ය නැති දෙයක් තිබුණා — suppressed.",
+                    "gate": {"precept": r2.violated_precept, "lang": lang}, "note": None}
+        audit({"event": "OK", "input": prompt, "src": "chat",
+               "note_flag": "l1out_overruled_by_l2"})
+    else:
+        audit({"event": "OK", "input": prompt, "src": "chat"})
     COUNTS[client_id] = COUNTS.get(client_id, 0) + 1
     note = note_for(prompt, out, COUNTS[client_id])   # 🪷 APPAMADA
     if online:
@@ -307,7 +313,7 @@ if __name__ == "__main__":
         ip = "127.0.0.1"
     finally:
         s.close()
-    print("🪷 ප්‍රකෘති AI Chat v0.7.1 — " + SYSTEM_ID)
+    print("🪷 ප්‍රකෘති AI Chat v0.8 — " + SYSTEM_ID)
     print("   PC:    http://127.0.0.1:8000")
     print("   Phone: http://" + ip + ":8000   (same Wi-Fi)")
     uvicorn.run(app, host="0.0.0.0", port=8000)
