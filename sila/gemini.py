@@ -1,14 +1,13 @@
-"""Multi-provider engine — ප්‍රකෘති AI ගේ මොළය.
-v0.8.1: model names කිහිපයක් automatic try (අලුත් AQ keys වල model
-availability වෙනස් නිසා). Gemini → OpenRouter failover."""
+"""Multi-provider engine — ප්‍රකෘති AI ��� ���.
+v0.8.3: 2.5-flash ��� thinking OFF attempt (fast) — ��� ��� ��� ��� ��� ���
+එකම ��� ��� ��� ��� (වැඩ ��� ��� ���). Gemini → OpenRouter failover."""
 import os
 
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/"
-# Gemini key එකක් එක්ක try කරන model names — priority order
 GEMINI_MODELS = [
+    "gemini-2.5-flash",          # ��� ��� ��� ���
     "gemini-2.0-flash",
-    "gemini-2.5-flash",
     "gemini-flash-latest",
     "gemini-3-flash-preview",
 ]
@@ -18,7 +17,7 @@ def _chain():
     chain = []
     if os.environ.get("GEMINI_API_KEY"):
         key = os.environ["GEMINI_API_KEY"]
-        model = os.environ.get("PRAKRUTHI_MODEL")          # manual override එකක් තියෙනවා නම් ඒක විතරක්
+        model = os.environ.get("PRAKRUTHI_MODEL")
         models = [model] if model else GEMINI_MODELS
         for m in models:
             chain.append(("gemini", key, GEMINI_URL, m))
@@ -30,15 +29,23 @@ def _chain():
 def online():
     return bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("OPENROUTER_API_KEY"))
 
+def _call(client, model, messages):
+    """පළවෙනියට thinking OFF (fast) → ��� ��� ��� ��� ��� ��� ��� ��� ��� ��� ��� ��� ���."""
+    try:
+        return client.chat.completions.create(
+            model=model, messages=messages, temperature=0.6,
+            extra_body={"google": {"thinking_config": {"thinking_budget": 0}}})
+    except Exception:
+        return client.chat.completions.create(
+            model=model, messages=messages, temperature=0.6)
+
 def chat(messages):
-    """Failover: provider + model combinations එකින් එක try. ඔක්කොම fail → raise."""
     errors = []
     for name, key, base_url, model in _chain():
         try:
             from openai import OpenAI
             client = OpenAI(api_key=key, base_url=base_url)
-            r = client.chat.completions.create(
-                model=model, messages=messages, temperature=0.6)
+            r = _call(client, model, messages)
             return r.choices[0].message.content
         except Exception as e:
             errors.append(f"{name}/{model}: {type(e).__name__}")

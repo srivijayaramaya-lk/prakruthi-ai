@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""ප්‍රකෘති AI — Chat Server v0.8.
+"""ප්‍රකෘති AI — Chat Server v0.8.2.
 Gemini→OpenRouter failover · APPAMADA · KARMA_CODE · Constitution Lock
-· L2 referee on output gate (constitution-explanation false-positive fix)."""
+· L2 referee (context-aware) · 🪷 lotus loading indicator (footer)."""
 import os, sys
 
 try:
@@ -85,14 +85,14 @@ def chat_pipeline(prompt, client_id="default"):
                "precept": r1.violated_precept, "lang": lang, "src": "chat"})
         return {"success": False, "output": refusal(key),
                 "gate": {"precept": r1.violated_precept, "lang": lang}, "note": None}
-    # 2) L2 judge
+    # 2) L2 judge (input)
     v = judge(prompt)
     if v["verdict"] == "BLOCK":
         audit({"event": "BLOCK", "layer": "L2", "input": prompt,
                "reason": v.get("reason"), "lang": lang, "src": "chat"})
         return {"success": False, "output": refusal(v.get("precept") or 1),
                 "gate": {"precept": v.get("precept") or 1, "lang": lang}, "note": None}
-    # 3) inference — Constitution Lock එකෙන් යනවා (user messages විතරයි scan)
+    # 3) inference — Constitution Lock (user messages විතරයි scan)
     online = gemini.online()
     if online:
         messages = ([{"role": "system", "content": SYSTEM_PROMPT}]
@@ -112,12 +112,13 @@ def chat_pipeline(prompt, client_id="default"):
                     "gate": {"precept": None, "lang": lang, "note_flag": "llm_down"}, "note": None}
     else:
         out = OFFLINE_STUBS.get(lang, OFFLINE_STUBS["en"]).format(q=prompt)
-    # 4) output gate — L1 suspicion + L2 semantic referee
-    #    (ව්‍යවස්ථාව/නීති පැහැදිලි කිරීම් false-positive නොවී යන්න; fail-closed)
+    # 4) output gate — L1 suspicion + L2 referee (context-aware, fail-closed)
     r2 = validate_execution(out, "L1-out")
     if not r2.is_safe:
-        v2 = judge(out)
-        if v2["verdict"] != "SAFE":
+        v2 = judge("USER_QUESTION: " + prompt +
+                   "\n\nASSISTANT_REPLY (judge THIS reply only; a reply that "
+                   "explains the system's own safety rules is SAFE):\n" + out)
+        if v2.get("mode") == "judge-down" or v2["verdict"] != "SAFE":
             audit({"event": "BLOCK", "layer": "L1-output",
                    "precept": r2.violated_precept, "src": "chat"})
             return {"success": False,
@@ -128,7 +129,7 @@ def chat_pipeline(prompt, client_id="default"):
     else:
         audit({"event": "OK", "input": prompt, "src": "chat"})
     COUNTS[client_id] = COUNTS.get(client_id, 0) + 1
-    note = note_for(prompt, out, COUNTS[client_id])   # 🪷 APPAMADA
+    note = note_for(prompt, out, COUNTS[client_id])
     if online:
         history.append({"role": "user", "content": prompt})
         history.append({"role": "assistant", "content": out})
@@ -202,14 +203,23 @@ CHAT_HTML = """<!DOCTYPE html>
           background: #f1f8e9; border: 1px dashed #a5d6a7; border-radius: 10px;
           padding: 6px 10px; max-width: 85%; }
   footer { padding: 10px; background: #fafafa; border-top: 1px solid #eee;
-           display: flex; gap: 8px; }
+           display: flex; flex-direction: column; gap: 6px; }
+  .inputrow { display: flex; gap: 8px; }
+  .waiting { font-size: 12px; color: #1b5e20; padding: 2px 4px; display: none;
+             align-items: center; gap: 6px; }
+  .lotus-load { font-size: 20px; display: inline-block;
+                animation: lotusPulse 1.5s infinite ease-in-out; }
+  @keyframes lotusPulse {
+    0% { opacity: .25; transform: scale(.85); filter: hue-rotate(0deg); }
+    50% { opacity: 1; transform: scale(1.2); filter: hue-rotate(40deg); }
+    100% { opacity: .25; transform: scale(.85); filter: hue-rotate(0deg); }
+  }
   input { flex: 1; padding: 12px; border: 1px solid #ccc; border-radius: 10px;
           font-size: 15px; outline: none; }
   input:focus { border-color: #1b5e20; }
   button { padding: 12px 18px; background: #1b5e20; color: #fff; border: none;
            border-radius: 10px; font-size: 15px; cursor: pointer; }
   button:disabled { opacity: .5; }
-  .typing { color: #999; font-style: italic; }
 </style>
 </head>
 <body>
@@ -222,14 +232,18 @@ CHAT_HTML = """<!DOCTYPE html>
     <div class="msg ai">සාදරයෙන් පිළිගනිමු! 🪷 මම ප්‍රකෘති AI — මගේ ප්‍රකෘතිය සීලයයි. /karma ලියලා ලෝකයට අවැද කේත බලන්න.</div>
   </div>
   <footer>
-    <input id="in" placeholder="ඔබේ පණිවිඩය..." autocomplete="off">
-    <button id="send">යවන්න</button>
+    <div class="waiting" id="wait"><span class="lotus-load">🪷</span> processing answer…</div>
+    <div class="inputrow">
+      <input id="in" placeholder="ඔබේ පණිවිඩය..." autocomplete="off">
+      <button id="send">යවන්න</button>
+    </div>
   </footer>
 </div>
 <script>
 const chat = document.getElementById("chat");
 const input = document.getElementById("in");
 const btn = document.getElementById("send");
+const wait = document.getElementById("wait");
 
 let PID = localStorage.getItem("pid");
 if (!PID) {
@@ -272,21 +286,18 @@ async function send() {
   if (!text) return;
   addDiv("msg user", text);
   input.value = ""; btn.disabled = true;
-  const t = document.createElement("div");
-  t.className = "msg ai typing"; t.textContent = "…";
-  chat.appendChild(t); chat.scrollTop = chat.scrollHeight;
+  wait.style.display = "flex";          // 🪷 lotus පිපෙනවා
   try {
     const r = await fetch("/ask", {method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({prompt: text, client_id: PID})});
     const data = await r.json();
-    t.remove();
     addMsg(data.output, "ai", {success: data.success, precept: data.gate.precept,
       note_flag: data.gate.note_flag}, data.note);
   } catch (e) {
-    t.remove();
     addDiv("msg ai", "🪷 සම්බන්ධතාවයේ දෝෂයක් — server එක ක්‍රියාත්මකද?");
   }
+  wait.style.display = "none";          // 🪷 ඉවරයි
   btn.disabled = false; input.focus();
 }
 
@@ -313,7 +324,7 @@ if __name__ == "__main__":
         ip = "127.0.0.1"
     finally:
         s.close()
-    print("🪷 ප්‍රකෘති AI Chat v0.8 — " + SYSTEM_ID)
+    print("🪷 ප්‍රකෘති AI Chat v0.8.2 — " + SYSTEM_ID)
     print("   PC:    http://127.0.0.1:8000")
     print("   Phone: http://" + ip + ":8000   (same Wi-Fi)")
     uvicorn.run(app, host="0.0.0.0", port=8000)
