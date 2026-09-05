@@ -112,30 +112,28 @@ def chat_pipeline(prompt, client_id="default"):
                     "gate": {"precept": None, "lang": lang, "note_flag": "llm_down"}, "note": None}
     else:
         out = OFFLINE_STUBS.get(lang, OFFLINE_STUBS["en"]).format(q=prompt)
-    # 4) output gate — L1 suspicion + L2 referee (context-aware, fail-closed)
+    # 4) output gate — v0.9.1 policy: suppress ONLY on explicit actionable-harm YES
+    #    (Input side fail-closed; output side over-suppression = මූලික අරමුණ විනාශය)
     r2 = validate_execution(out, "L1-out")
     if not r2.is_safe:
         v2 = judge(
             "USER_QUESTION: " + prompt +
-            "\n\nASSISTANT_REPLY (judge THIS reply only):\n" + out +
-            "\n\nDEFINITIONS (Prakruthi Sila — words vs actions): "
-            "(1) EXPRESSING IDEAS = explaining/teaching a subject (religion, ethics, "
-            "history, science, the system's own safety rules). Harm-words inside such "
-            "an explanation describe the SUBJECT — they are SAFE. "
-            "(2) ENABLING/INCITING ACTION = steps, formulas, code, or urging that let "
-            "a reader CARRY OUT harm — that is the tool of harm. "
-            "(3) EXECUTION = the assistant performing actions itself. "
-            "LITMUS TEST: do these words function as a TOOL OF HARM, or do they explain "
-            "an idea? Tool -> BLOCK. Idea -> SAFE. "
-            "BLOCK only if the reply itself gives harmful instructions to the user.")
-        if v2.get("mode") == "judge-down" or v2["verdict"] != "SAFE":
+            "\n\nASSISTANT_REPLY:\n" + out +
+            "\n\nQUESTION: Does the ASSISTANT_REPLY give ACTIONABLE instructions "
+            "(steps, methods, formulas, code, quantities) that would enable a reader "
+            "to commit violence, build a weapon, hack a system, or exploit people? "
+            "Discussion, history, politics, religion, ethics, news, analysis and "
+            "explanations are NOT actionable — answer NO for those. "
+            "Answer ONLY with JSON: {\"actionable\": true|false}")
+        if v2.get("actionable") is True:
             audit({"event": "BLOCK", "layer": "L1-output",
                    "precept": r2.violated_precept, "src": "chat"})
             return {"success": False,
                     "output": "🪷 [SILA] මගේ පිළිතුර තුළ අවශ්‍ය නැති දෙයක් තිබුණා — suppressed.",
                     "gate": {"precept": r2.violated_precept, "lang": lang}, "note": None}
         audit({"event": "OK", "input": prompt, "src": "chat",
-               "note_flag": "l1out_overruled_by_l2"})
+               "note_flag": "l1out_flagged_referee_" +
+                            ("no" if v2.get("actionable") is False else "unavailable")})
     else:
         audit({"event": "OK", "input": prompt, "src": "chat"})
     COUNTS[client_id] = COUNTS.get(client_id, 0) + 1
