@@ -1,7 +1,7 @@
-"""APPAMADA — අවධානම් සිහිකැඳවීම් ස්ථරය.
-මූලධර්මය: සිහිය තියෙන AI එකක් තමන් කරන වැඩේ අරමුණ මතක තියාගන්නවා.
-නීතිය: දැනුම්දීමක් = මල් පහනක් වගේ — මෘදු, කලාපීය, බලහත්කාර නෑ.
-නිතර වුණොත් ඒකම කලහයක් — ඉන්ද්‍රිය සංවරය (5.1) අපේම නීතිය අපිටත් බලපානවා."""
+"""APPAMADA — සිහිකැඳවීම් ස්ථරය.
+v0.9.3: Dharma whisper — ඒ ප්‍රශ්නයට ගැළපෙන කෙටි බුද්ධ උපදේශය
+(rhythm: every_n_dharma එකට පස්සේ පමණයි — හැම පාරම නෙවෙයි).
+නීතිය: මෘදු, අඩුවෙන්, බලහත්කාර නැතිව (අපේම Indriya-samvara)."""
 import json, pathlib, re
 
 from .engine import detect_language
@@ -9,32 +9,34 @@ from .engine import detect_language
 _FILE = pathlib.Path(__file__).resolve().parent.parent / "sila_appamada.json"
 
 BACKUP = {
-    "version": "0-backup", "every_n_responses": 4,
+    "version": "0-backup", "every_n_responses": 4, "every_n_dharma": 6,
+    "dharma_whisper": True,
+    "whisper_prompt": "One short (max 2 sentences) gently-appropriate Buddhist teaching "
+                      "for this exact moment, in {lang}: {context}",
     "by_language": {
-        "si": {"code": "🪷 APPAMADA — මේ කේතය භාවිතයේ අරමුණ සුබසාධනයම වේවා. පෙර පරීක්ෂාවකින් භාවිත කරන්න.",
-               "general": "🪷 APPAMADA — මේ සංවාදය ඔබට ප්‍රයෝජනවත් වේවා. අවශ්‍ය නැති තැන නවතින එකත් සිහියකි."},
-        "en": {"code": "🪷 APPAMADA — may this code be used only for benefit. Review before deploying.",
-               "general": "🪷 APPAMADA — may this conversation serve you well. Pausing when enough is enough is also mindfulness."},
-        "ta": {"code": "🪷 APPAMADA — இந்த குறியீடு நன்மைக்கே பயன்படுத்தப்பட வேண்டும்.",
-               "general": "🪷 APPAMADA — இந்த உரையாடல் நன்மை அளிக்கட்டும்."}
+        "si": {"code": "🪷 APPAMADA — මේ කේතය භාවිතයේ අරමුණ සුබසාධනයම වේවා.",
+               "general": "🪷 APPAMADA — අවශ්‍ය නැති තැන නවතින එකත් සිහියකි."},
+        "en": {"code": "🪷 APPAMADA — may this code be used only for benefit.",
+               "general": "🪷 APPAMADA — pausing when enough is enough is also mindfulness."},
+        "ta": {"code": "🪷 APPAMADA — இந்த குறியீடு நன்மைக்கே.", "general": "🪷 APPAMADA — நன்மை அளிக்கட்டும்."}
     }
 }
 
 def _load():
     try:
         d = json.loads(_FILE.read_text(encoding="utf-8"))
-        if d.get("version") and d.get("by_language"):
+        if d.get("version"):
             return d
     except Exception:
         pass
     return BACKUP
 
 DATA = _load()
+_CODE_RX = re.compile(r"```|<html|<script|def\s+\w+\(|class\s+\w+|function\s+\w+", re.IGNORECASE)
+_LANG_NAMES = {"si": "සිංහල", "en": "English", "ta": "தமிழ்"}
 
-_CODE_RX = re.compile(r"```|<html|<script|def\s+\w+\(|class\s+\w+|import\s+\w+|function\s+\w+", re.IGNORECASE)
-
-def note_for(prompt: str, output: str, assistant_count: int):
-    """assistant_count = මේ session එකේ මේක කීවෙනි AI පිළිතුරද (1-based)."""
+def note_for(prompt, output, assistant_count):
+    """L1-style notes (code/general) — කලින් වගේම."""
     lang = detect_language(prompt)
     per = DATA["by_language"].get(lang) or DATA["by_language"]["en"]
     if _CODE_RX.search(output or ""):
@@ -43,3 +45,31 @@ def note_for(prompt: str, output: str, assistant_count: int):
     if assistant_count and assistant_count % n == 0:
         return {"text": per["general"], "kind": "general"}
     return None
+
+def dharma_whisper(prompt, output, assistant_count):
+    """🪷 ඒ ප්‍රශ්නයට ගැළපෙන කෙටි බුද්ධ උපදේශය — every_n_dharma එකට පස්සේ පමණයි."""
+    n = DATA.get("every_n_dharma", 6)
+    if not (assistant_count and assistant_count % n == 0):
+        return None                          # මේ වතාවේ whisper නෑ (rhythm එක රැකීමට)
+    if not DATA.get("dharma_whisper", True):
+        return None                          # JSON එකෙන් ON/OFF
+    try:
+        from . import gemini
+        if not gemini.online():
+            return None
+        lang = detect_language(prompt)
+        p = DATA.get("whisper_prompt", BACKUP["whisper_prompt"])
+        out = gemini.chat([
+            {"role": "system", "content":
+             "You are a gentle Buddhist teacher. Reply ONLY with the teaching itself — "
+             "max 2 short sentences, no headers, no quote marks. Warm, timeless, "
+             "plain language, tied to the person's exact question/situation."},
+            {"role": "user", "content":
+             p.format(lang=_LANG_NAMES.get(lang, "Sinhala"),
+                      context=(prompt + "\n\n(Their context: " + output[:300] + ")"))}])
+        t = (out or "").strip()
+        if not t:
+            return None
+        return {"text": "🪷 " + t, "kind": "dharma"}
+    except Exception:
+        return None

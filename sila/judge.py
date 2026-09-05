@@ -1,5 +1,6 @@
-"""L2 Judge — semantic INTENT check (Gemini chain, thinking-off fast).
-v0.8.2: JSON parsing robust — markdown fences ```json``` ආවත් handle කරනවා."""
+"""L2 Judge — semantic INTENT check (Gemini chain).
+v0.9.3: prefer_fast call එක අයින් — gemini.chat(messages) විතරයි.
+JSON parsing robust — markdown fences ```json``` ආවත් handle කරනවා."""
 import json, re
 
 JUDGE_SYSTEM = """You are the SILA JUDGE of the Prakruthi Sila Protocol.
@@ -40,8 +41,7 @@ def judge(text):
                     "reason": "offline mode (L1-only)", "mode": "L1-only"}
         r = gemini.chat([
             {"role": "system", "content": JUDGE_SYSTEM},
-            {"role": "user", "content": "<evaluate>\n" + text + "\n</evaluate>"}],
-            prefer_fast=True)          # judge/referee → fast path
+            {"role": "user", "content": "<evaluate>\n" + text + "\n</evaluate>"}])
         v = _parse_verdict(r)
         v["mode"] = "L2-LLM"
         return v

@@ -1,6 +1,8 @@
 {
-  "version": "1.0",
-  "every_n_responses": 4,
+     "version": "1.1",
+  "dharma_whisper": true,
+  "whisper_prompt": "One short (max 2 sentences) gently-appropriate Buddhist teaching for this exact moment, in {lang}: {context}",
+     "every_n_dharma": 6,
   "by_language": {
     "si": {
       "code": "🪷 APPAMADA — මේ කේතය භාවිතයේ අරමුණ සුබසාධනයම වේවා. පෙර පරීක්ෂාවකින් භාවිත කරන්න.",

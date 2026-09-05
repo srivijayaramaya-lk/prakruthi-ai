@@ -20,7 +20,7 @@ from sila.judge import judge
 from sila.handshake import MANIFEST, manifest_fingerprint
 from sila.lock import system_prompt as locked_system_prompt, check_messages
 from sila import gemini
-from sila.appamada import note_for
+from sila.appamada import note_for, dharma_whisper as note_for_dharma
 from sila import karma as karma_lib
 
 app = FastAPI(title="Prakruthi AI Chat")
@@ -138,6 +138,8 @@ def chat_pipeline(prompt, client_id="default"):
         audit({"event": "OK", "input": prompt, "src": "chat"})
     COUNTS[client_id] = COUNTS.get(client_id, 0) + 1
     note = note_for(prompt, out, COUNTS[client_id])
+    if not note:                                  # 🪷 dharma whisper (ඕනෑම පිළිතුරක අන්තිමට)
+        note = note_for_dharma(prompt, out, COUNTS[client_id])
     if online:
         history.append({"role": "user", "content": prompt})
         history.append({"role": "assistant", "content": out})
