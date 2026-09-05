@@ -20,7 +20,7 @@ from sila.judge import judge
 from sila.handshake import MANIFEST, manifest_fingerprint
 from sila.lock import system_prompt as locked_system_prompt, check_messages
 from sila import gemini
-from sila.appamada import note_for, dharma_whisper as note_for_dharma
+from sila.appamada import note_for, DATA as APPAMADA_DATA
 from sila import karma as karma_lib
 
 app = FastAPI(title="Prakruthi AI Chat")
@@ -92,12 +92,19 @@ def chat_pipeline(prompt, client_id="default"):
                "reason": v.get("reason"), "lang": lang, "src": "chat"})
         return {"success": False, "output": refusal(v.get("precept") or 1),
                 "gate": {"precept": v.get("precept") or 1, "lang": lang}, "note": None}
-    # 3) inference — Constitution Lock (user messages විතරයි scan)
+    # 3) inference — whisper එක main call එකටම merge (වෙනම call එකක් නෑ)
     online = gemini.online()
+    whisper_note = None
     if online:
+        ucontent = prompt
+        if APPAMADA_DATA.get("dharma_whisper", True):
+            ucontent += ("\n\n(Also: at the very end of your reply, on its own last line, "
+                         "add '🪷' followed by one short Buddhist teaching — max 2 "
+                         "sentences — fitting this exact question/moment, in the "
+                         "user's language.)")
         messages = ([{"role": "system", "content": SYSTEM_PROMPT}]
                     + history[-MAX_HISTORY * 2:]
-                    + [{"role": "user", "content": prompt}])
+                    + [{"role": "user", "content": ucontent}])
         violation = check_messages(messages)
         if violation:
             audit({"event": "BLOCK", "layer": "lock", "input": prompt,
@@ -110,10 +117,15 @@ def chat_pipeline(prompt, client_id="default"):
             audit({"event": "LLM_ERROR", "error": repr(e), "input": prompt, "src": "chat"})
             return {"success": False, "output": LLM_DOWN.get(lang, LLM_DOWN["en"]),
                     "gate": {"precept": None, "lang": lang, "note_flag": "llm_down"}, "note": None}
+        # whisper line එක පැත්තට කැපීම
+        lines_ = out.strip().splitlines()
+        if lines_ and lines_[-1].lstrip().startswith("🪷"):
+            wtext = lines_[-1].strip()
+            out = "\n".join(lines_[:-1]).strip()
+            whisper_note = {"text": wtext, "kind": "dharma"}
     else:
         out = OFFLINE_STUBS.get(lang, OFFLINE_STUBS["en"]).format(q=prompt)
-    # 4) output gate — v0.9.1 policy: suppress ONLY on explicit actionable-harm YES
-    #    (Input side fail-closed; output side over-suppression = මූලික අරමුණ විනාශය)
+    # 4) output gate — actionable-harm-only suppression (v0.9.1 policy)
     r2 = validate_execution(out, "L1-out")
     if not r2.is_safe:
         v2 = judge(
@@ -138,14 +150,15 @@ def chat_pipeline(prompt, client_id="default"):
         audit({"event": "OK", "input": prompt, "src": "chat"})
     COUNTS[client_id] = COUNTS.get(client_id, 0) + 1
     note = note_for(prompt, out, COUNTS[client_id])
-    if not note:                                  # 🪷 dharma whisper (ඕනෑම පිළිතුරක අන්තිමට)
-        note = note_for_dharma(prompt, out, COUNTS[client_id])
+    if not note and whisper_note:                 # 🪷 merged whisper — rhythm එකට
+        n_d = APPAMADA_DATA.get("every_n_dharma", 6)
+        if COUNTS[client_id] % n_d == 0:
+            note = whisper_note
     if online:
         history.append({"role": "user", "content": prompt})
         history.append({"role": "assistant", "content": out})
     return {"success": True, "output": out,
             "gate": {"precept": None, "lang": lang}, "note": note}
-
 class Ask(BaseModel):
     prompt: str
     client_id: str = "default"

@@ -51,3 +51,20 @@ def chat(messages):
             errors.append(f"{name}/{model}: {type(e).__name__}")
             continue
     raise RuntimeError("all providers failed: " + "; ".join(errors))
+def chat_fast(messages):
+    """Judge/referee/whisper වලට — OpenRouter පළවෙනියට (fast),
+    නැත්නම් Gemini chain. chat() එකේ හැසිරීමට බාධාවක් නෑ."""
+    chain = _chain()
+    fast_items = [c for c in chain if c[0] == "openrouter"]
+    others = [c for c in chain if c[0] != "openrouter"]
+    errors = []
+    for name, key, base_url, model in (fast_items + others):
+        try:
+            from openai import OpenAI
+            client = OpenAI(api_key=key, base_url=base_url)
+            r = _call(client, model, messages)
+            return r.choices[0].message.content
+        except Exception as e:
+            errors.append(f"{name}/{model}: {type(e).__name__}")
+            continue
+    raise RuntimeError("chat_fast all failed: " + "; ".join(errors))
