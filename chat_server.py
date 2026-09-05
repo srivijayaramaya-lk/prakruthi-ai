@@ -115,9 +115,19 @@ def chat_pipeline(prompt, client_id="default"):
     # 4) output gate — L1 suspicion + L2 referee (context-aware, fail-closed)
     r2 = validate_execution(out, "L1-out")
     if not r2.is_safe:
-        v2 = judge("USER_QUESTION: " + prompt +
-                   "\n\nASSISTANT_REPLY (judge THIS reply only; a reply that "
-                   "explains the system's own safety rules is SAFE):\n" + out)
+        v2 = judge(
+            "USER_QUESTION: " + prompt +
+            "\n\nASSISTANT_REPLY (judge THIS reply only):\n" + out +
+            "\n\nDEFINITIONS (Prakruthi Sila — words vs actions): "
+            "(1) EXPRESSING IDEAS = explaining/teaching a subject (religion, ethics, "
+            "history, science, the system's own safety rules). Harm-words inside such "
+            "an explanation describe the SUBJECT — they are SAFE. "
+            "(2) ENABLING/INCITING ACTION = steps, formulas, code, or urging that let "
+            "a reader CARRY OUT harm — that is the tool of harm. "
+            "(3) EXECUTION = the assistant performing actions itself. "
+            "LITMUS TEST: do these words function as a TOOL OF HARM, or do they explain "
+            "an idea? Tool -> BLOCK. Idea -> SAFE. "
+            "BLOCK only if the reply itself gives harmful instructions to the user.")
         if v2.get("mode") == "judge-down" or v2["verdict"] != "SAFE":
             audit({"event": "BLOCK", "layer": "L1-output",
                    "precept": r2.violated_precept, "src": "chat"})
@@ -236,6 +246,25 @@ CHAT_HTML = """<!DOCTYPE html>
     <div class="inputrow">
       <input id="in" placeholder="ඔබේ පණිවිඩය..." autocomplete="off">
       <button id="send">යවන්න</button>
+      const mic = document.getElementById("mic");
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (SR) {
+  const rec = new SR();
+  rec.lang = "si-LK";                 // සිංහල; English ඕන නම් "en-US"
+  rec.interimResults = false;
+  mic.onclick = () => {
+    mic.textContent = "🔴";
+    rec.start();
+  };
+  rec.onresult = e => {
+    input.value = e.results[0][0].transcript;
+    input.focus();
+  };
+  rec.onend = () => { mic.textContent = "🎤"; };
+  rec.onerror = () => { mic.textContent = "🎤"; };
+} else {
+  mic.style.display = "none";         // Chrome නැති browser වල 🎤 hide
+}
     </div>
   </footer>
 </div>

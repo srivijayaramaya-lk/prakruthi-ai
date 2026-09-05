@@ -37,4 +37,4 @@ def test_metta_clock_listed():
 
 def test_manifest_has_appamada_and_karma():
     assert "appamada" in MANIFEST and "karma_code" in MANIFEST
-    assert MANIFEST["version"] == "0.2"
+    assert MANIFEST["version"] == "0.3"   # v0.9: identity_formula + definitions එක්ක
