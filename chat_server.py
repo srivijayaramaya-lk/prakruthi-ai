@@ -229,7 +229,7 @@ CHAT_HTML = """<!DOCTYPE html>
     <div class="sub"><span class="badge" id="mode">…</span> SILA <span id="fp"></span></div>
   </header>
   <div id="chat">
-    <div class="msg ai">සාදරයෙන් පිළිගනිමු! 🪷 මම ප්‍රකෘති AI — මගේ ප්‍රකෘතිය සීලයයි. /karma ලියලා ලෝකයට අවැද කේත බලන්න.</div>
+    <div class="msg ai">සාදරයෙන් පිළිගනිමු! 🪷 මම ප්‍රකෘති AI .</div>
   </div>
   <footer>
     <div class="waiting" id="wait"><span class="lotus-load">🪷</span> processing answer…</div>
