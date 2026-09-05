@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: prakruthi-ai
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn chat_server:app --workers 1 --bind 0.0.0.0:$PORT --timeout 120

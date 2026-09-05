@@ -370,4 +370,4 @@ if __name__ == "__main__":
     print("🪷 ප්‍රකෘති AI Chat v0.9 — " + SYSTEM_ID)
     print("   PC:    http://127.0.0.1:8000")
     print("   Phone: http://" + ip + ":8000   (same Wi-Fi)")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
