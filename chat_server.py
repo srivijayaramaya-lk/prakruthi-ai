@@ -240,10 +240,10 @@ CHAT_HTML = """<!DOCTYPE html>
     <div class="sub"><span class="badge" id="mode">…</span> SILA <span id="fp"></span></div>
   </header>
   <div id="chat">
-    <div class="msg ai">සාදරයෙන් පිළිගනිමු! 🪷 මම ප්‍රකෘති AI — මගේ ප්‍රකෘතිය සීලයයි. /karma ලියලා ලෝකයට අවැද කේත බලන්න. 🎤 ඔබලා සිංහලෙන් කතා කරන්නත් පුළුවන්.</div>
+    <div class="msg ai">සාදරයෙන් පිළිගනිමු! 🪷 මම ප්‍රකෘති AI .</div>
   </div>
   <footer>
-    <div class="waiting" id="wait"><span class="lotus-load">🪷</span> පිළිතුර පිපෙමින්…</div>
+    <div class="waiting" id="wait"><span class="lotus-load">🪷</span> prosessing answer …</div>
     <div class="inputrow">
       <input id="in" placeholder="ඔබේ පණිවිඩය..." autocomplete="off">
       <button id="mic" title="කතා කරන්න">🎤</button>
