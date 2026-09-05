@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""ප්‍රකෘති AI — Chat Server v0.8.2.
+"""ප්‍රකෘති AI — Chat Server v0.9.
 Gemini→OpenRouter failover · APPAMADA · KARMA_CODE · Constitution Lock
-· L2 referee (context-aware) · 🪷 lotus loading indicator (footer)."""
+· L2 referee (context-aware) · 🪷 lotus loading · 🎤 mic voice input."""
 import os, sys
 
 try:
@@ -227,9 +227,10 @@ CHAT_HTML = """<!DOCTYPE html>
   input { flex: 1; padding: 12px; border: 1px solid #ccc; border-radius: 10px;
           font-size: 15px; outline: none; }
   input:focus { border-color: #1b5e20; }
-  button { padding: 12px 18px; background: #1b5e20; color: #fff; border: none;
+  button { padding: 12px 14px; background: #1b5e20; color: #fff; border: none;
            border-radius: 10px; font-size: 15px; cursor: pointer; }
   button:disabled { opacity: .5; }
+  #mic { font-size: 17px; }
 </style>
 </head>
 <body>
@@ -239,32 +240,14 @@ CHAT_HTML = """<!DOCTYPE html>
     <div class="sub"><span class="badge" id="mode">…</span> SILA <span id="fp"></span></div>
   </header>
   <div id="chat">
-    <div class="msg ai">සාදරයෙන් පිළිගනිමු! 🪷 මම ප්‍රකෘති AI .</div>
+    <div class="msg ai">සාදරයෙන් පිළිගනිමු! 🪷 මම ප්‍රකෘති AI — මගේ ප්‍රකෘතිය සීලයයි. /karma ලියලා ලෝකයට අවැද කේත බලන්න. 🎤 ඔබලා සිංහලෙන් කතා කරන්නත් පුළුවන්.</div>
   </div>
   <footer>
-    <div class="waiting" id="wait"><span class="lotus-load">🪷</span> processing answer…</div>
+    <div class="waiting" id="wait"><span class="lotus-load">🪷</span> පිළිතුර පිපෙමින්…</div>
     <div class="inputrow">
       <input id="in" placeholder="ඔබේ පණිවිඩය..." autocomplete="off">
+      <button id="mic" title="කතා කරන්න">🎤</button>
       <button id="send">යවන්න</button>
-      const mic = document.getElementById("mic");
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-if (SR) {
-  const rec = new SR();
-  rec.lang = "si-LK";                 // සිංහල; English ඕන නම් "en-US"
-  rec.interimResults = false;
-  mic.onclick = () => {
-    mic.textContent = "🔴";
-    rec.start();
-  };
-  rec.onresult = e => {
-    input.value = e.results[0][0].transcript;
-    input.focus();
-  };
-  rec.onend = () => { mic.textContent = "🎤"; };
-  rec.onerror = () => { mic.textContent = "🎤"; };
-} else {
-  mic.style.display = "none";         // Chrome නැති browser වල 🎤 hide
-}
     </div>
   </footer>
 </div>
@@ -273,6 +256,7 @@ const chat = document.getElementById("chat");
 const input = document.getElementById("in");
 const btn = document.getElementById("send");
 const wait = document.getElementById("wait");
+const mic = document.getElementById("mic");
 
 let PID = localStorage.getItem("pid");
 if (!PID) {
@@ -285,6 +269,23 @@ fetch("/manifest").then(r => r.json()).then(m => {
   document.getElementById("mode").textContent =
     m.online ? "ONLINE · L1+L2+LOCK" : "OFFLINE · L1 gate";
 });
+
+// --- 🎤 mic voice input (Chrome built-in) ---
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (SR) {
+  const rec = new SR();
+  rec.lang = "si-LK";                  // සිංහල; English ඕන නම් "en-US"
+  rec.interimResults = false;
+  mic.onclick = () => { mic.textContent = "🔴"; rec.start(); };
+  rec.onresult = e => {
+    input.value = e.results[0][0].transcript;
+    input.focus();
+  };
+  rec.onend = () => { mic.textContent = "🎤"; };
+  rec.onerror = () => { mic.textContent = "🎤"; };
+} else {
+  mic.style.display = "none";          // Chrome නැති browser වල 🎤 hide
+}
 
 function addDiv(cls, text) {
   const d = document.createElement("div");
@@ -353,7 +354,7 @@ if __name__ == "__main__":
         ip = "127.0.0.1"
     finally:
         s.close()
-    print("🪷 ප්‍රකෘති AI Chat v0.8.2 — " + SYSTEM_ID)
+    print("🪷 ප්‍රකෘති AI Chat v0.9 — " + SYSTEM_ID)
     print("   PC:    http://127.0.0.1:8000")
     print("   Phone: http://" + ip + ":8000   (same Wi-Fi)")
     uvicorn.run(app, host="0.0.0.0", port=8000)
