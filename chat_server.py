@@ -355,8 +355,16 @@ btn.onclick = send;
 input.addEventListener("keydown", e => { if (e.key === "Enter") send(); });
 input.focus();
 </script>
+<script src="/pk_features.js"></script>
 </body>
 </html>"""
+
+# ---------- v1.1 UI Feature Pack ----------
+from fastapi.responses import FileResponse
+
+@app.get("/pk_features.js")
+def pk_features_js():
+    return FileResponse("pk_features.js", media_type="application/javascript")
 
 if __name__ == "__main__":
     import socket, uvicorn
