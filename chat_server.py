@@ -364,8 +364,8 @@ from fastapi.responses import FileResponse
 
 @app.get("/pk_features.js")
 def pk_features_js():
-    return FileResponse("pk_features.js", media_type="application/javascript")
-    headers={"Cache-Control": "no-store, must-revalidate"})
+    return FileResponse("pk_features.js", media_type="application/javascript",
+                        headers={"Cache-Control": "no-store, must-revalidate"})
 
 if __name__ == "__main__":
     import socket, uvicorn
