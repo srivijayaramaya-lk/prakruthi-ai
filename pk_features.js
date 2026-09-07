@@ -1,6 +1,6 @@
-/* ප්‍රකෘති AI — UI Pack v1.3.2 (Milky Glass)
+/* ප්‍රකෘති AI — UI Pack v1.3.3 (Frosted Milky)
    ☰ menu · 🔤 font · 🌏 language · 💾 history drawer · 📌 context folders
-   Chat panel = bright milky frosted glass. All data stays in your browser. */
+   Chat panel = bright frosted glass, single-layer (no dark stacking). All data local. */
 (function () {
   "use strict";
   if (window.__pkFeaturesLoaded) return;
@@ -18,7 +18,6 @@
   };
   localStorage.removeItem("pk_theme");
 
-  /* ---------- CSS ---------- */
   var css = [
     "html,body{min-height:100%!important}",
     "body{background:linear-gradient(160deg,#0d2a1e 0%,#1c4d38 42%,#7ab294 100%)!important;background-attachment:fixed!important}",
@@ -81,7 +80,6 @@
   styleEl.textContent = css;
   document.head.appendChild(styleEl);
 
-  /* ---------- helpers ---------- */
   function el(tag, cls, txt) {
     var e = document.createElement(tag);
     if (cls) e.className = cls;
@@ -100,7 +98,6 @@
   }
   function lum(r, g, b) { return 0.299 * r + 0.587 * g + 0.114 * b; }
 
-  /* ---------- glass background + engine ---------- */
   function buildGlassBg() {
     var bg = el("div"); bg.id = "pkGlassBg";
     bg.innerHTML = '<div class="b b1"></div><div class="b b2"></div><div class="b b3"></div><div class="b b4"></div><div class="b b5"></div>';
@@ -109,18 +106,26 @@
   function liftContent() {
     var kids = document.body.children;
     for (var i = 0; i < kids.length; i++) {
-      var k = kids[i];
-      var t = k.tagName;
+      var k = kids[i], t = k.tagName;
       if (k.id === "pkGlassBg" || t === "SCRIPT" || t === "STYLE" || t === "LINK") continue;
       var cs; try { cs = getComputedStyle(k); } catch (e) { continue; }
       if (cs.position === "static") { k.style.position = "relative"; k.style.zIndex = 1; }
       else { var z = parseInt(cs.zIndex, 10); if (isNaN(z) || z < 1) k.style.zIndex = 1; }
     }
   }
+  function ancestorGlassed(elx) {
+    var p = elx.parentElement;
+    while (p && p !== document.body) {
+      if (p.dataset && p.dataset.pkGlass) return true;
+      p = p.parentElement;
+    }
+    return false;
+  }
   function glassify(elx) {
     if (elx.dataset && elx.dataset.pkGlass) return;
     if (elx === document.body || elx === document.documentElement) return;
     if (elx.closest && elx.closest("#pkGlassBg,#pkMenu,#pkDrawer,#pkToast,#pkScrim,#pkMenuBtn")) return;
+    if (ancestorGlassed(elx)) return;
     var cs; try { cs = getComputedStyle(elx); } catch (e) { return; }
     var bg = cs.backgroundColor;
     var grad = cs.backgroundImage && cs.backgroundImage !== "none";
@@ -130,36 +135,34 @@
     var a = p ? (p.length > 3 ? parseFloat(p[3]) : 1) : 0;
     if (a < 0.05 && !grad) return;
     var w = elx.offsetWidth || 0, h = elx.offsetHeight || 0;
-    var bigPanel = w > 280 && h > 220;   /* main chat panel = milky glass */
+    var bigPanel = w > 280 && h > 220;
+    var r = p ? +p[0] : 255, g = p ? +p[1] : 255, b = p ? +p[2] : 255;
+    var L = lum(r, g, b);
     elx.dataset.pkGlass = "1";
-    elx.style.backdropFilter = "blur(22px) saturate(1.45)";
-    elx.style.webkitBackdropFilter = "blur(22px) saturate(1.45)";
+    elx.style.setProperty("backdrop-filter", "blur(22px) saturate(1.45)", "important");
+    elx.style.setProperty("-webkit-backdrop-filter", "blur(22px) saturate(1.45)", "important");
     if (bigPanel) {
-      elx.style.backgroundImage = "none";
-      elx.style.backgroundColor = "rgba(255,255,255,0.55)";
-      elx.style.border = "1px solid rgba(255,255,255,.75)";
-      elx.style.borderRadius = "18px";
-      elx.style.boxShadow = "0 12px 40px rgba(8,36,22,.22)";
+      /* main chat panel → single bright milky glass layer */
+      elx.style.setProperty("background-image", "none", "important");
+      elx.style.setProperty("background-color", "rgba(255,255,255,0.72)", "important");
+      elx.style.setProperty("border", "1px solid rgba(255,255,255,.8)", "important");
+      elx.style.setProperty("border-radius", "18px", "important");
+      elx.style.setProperty("box-shadow", "0 12px 40px rgba(8,36,22,.25)", "important");
       return;
     }
-    if (!p) {
-      elx.style.backgroundImage = "none";
-      elx.style.backgroundColor = "rgba(255,255,255,0.4)";
-      return;
-    }
-    var r = +p[0], g = +p[1], b = +p[2], L = lum(r, g, b);
     if (L < 100) {
-      elx.style.backgroundColor = "rgba(" + r + "," + g + "," + b + ",0.55)";
+      /* dark surfaces (header) → dark glass, white text stays readable */
+      elx.style.setProperty("background-color", "rgba(" + r + "," + g + "," + b + ",0.55)", "important");
+      elx.style.setProperty("border-color", "rgba(255,255,255,.4)", "important");
     } else {
-      elx.style.backgroundImage = "none";
-      elx.style.backgroundColor = "rgba(255,255,255,0.45)";
+      elx.style.setProperty("background-image", "none", "important");
+      elx.style.setProperty("background-color", "rgba(255,255,255,0.5)", "important");
+      if (cs.borderTopStyle !== "none" && parseFloat(cs.borderTopWidth) > 0)
+        elx.style.setProperty("border-color", "rgba(255,255,255,.7)", "important");
+      var rad = parseFloat(cs.borderTopLeftRadius) || 0;
+      if (w > 140 && h > 50 && rad < 10) elx.style.setProperty("border-radius", "14px", "important");
+      if (w > 220) elx.style.setProperty("box-shadow", "0 10px 34px rgba(8,36,22,.2)", "important");
     }
-    if (cs.borderTopStyle !== "none" && parseFloat(cs.borderTopWidth) > 0) {
-      elx.style.borderColor = "rgba(255,255,255,.65)";
-    }
-    var rad = parseFloat(cs.borderTopLeftRadius) || 0;
-    if (w > 140 && h > 50 && rad < 10) elx.style.borderRadius = "14px";
-    if (w > 220) elx.style.boxShadow = "0 10px 34px rgba(8,36,22,.18)";
   }
   function scanGlass(root) {
     if (!root || root.nodeType !== 1) return;
@@ -168,7 +171,6 @@
     for (var i = 0; i < all.length; i++) glassify(all[i]);
   }
 
-  /* ---------- history store ---------- */
   function loadHist() { try { return JSON.parse(localStorage.getItem(LS.hist) || "[]"); } catch (e) { return []; } }
   function addHist(role, text) {
     if (!text || typeof text !== "string") return;
@@ -176,7 +178,6 @@
     try { localStorage.setItem(LS.hist, JSON.stringify(h.slice(-60))); } catch (e) {}
   }
 
-  /* ---------- context folders ---------- */
   function loadCtx() {
     var a; try { a = JSON.parse(localStorage.getItem(LS.ctx) || "[]"); } catch (e) { a = []; }
     if (!Array.isArray(a)) a = [];
@@ -188,15 +189,13 @@
     var a = loadCtx(), parts = [];
     for (var i = 0; i < a.length; i++) {
       if (!a[i].on) continue;
-      var nm = (a[i].name || "").trim();
-      var ct = (a[i].content || "").trim();
-      var txt = ct || nm; /* either box works */
+      var nm = (a[i].name || "").trim(), ct = (a[i].content || "").trim();
+      var txt = ct || nm;
       if (txt) parts.push((nm && ct) ? nm + ": " + ct : txt);
     }
     return parts.join(" | ");
   }
 
-  /* ---------- network hooks ---------- */
   var REQ_KEYS = ["message", "prompt", "text", "q", "content"];
   var RESP_KEYS = ["reply", "response", "output", "text", "answer", "message"];
   function pick(obj, keys) {
@@ -204,7 +203,7 @@
       if (obj && typeof obj[keys[i]] === "string" && obj[keys[i]]) return obj[keys[i]];
     return "";
   }
-  function pickDeep(obj, keys) { /* fallback: find longest string anywhere */
+  function pickDeep(obj, keys) {
     var v = pick(obj, keys); if (v) return v;
     var best = "";
     try {
@@ -213,10 +212,8 @@
         else if (obj[k] && typeof obj[k] === "object") {
           var inner = pick(obj[k], keys);
           if (inner && inner.length > best.length) best = inner;
-          else {
-            for (var k2 in obj[k])
-              if (typeof obj[k][k2] === "string" && obj[k][k2].length > best.length) best = obj[k][k2];
-          }
+          else for (var k2 in obj[k])
+            if (typeof obj[k][k2] === "string" && obj[k][k2].length > best.length) best = obj[k][k2];
         }
       }
     } catch (e) {}
@@ -272,17 +269,13 @@
       if (xhr.__pkChat && typeof body === "string") {
         var nb = prepareBody(body); if (nb) body = nb;
         xhr.addEventListener("load", function () {
-          try {
-            var d = JSON.parse(xhr.responseText);
-            addHist("a", pickDeep(d, RESP_KEYS));
-          } catch (e) {}
+          try { addHist("a", pickDeep(JSON.parse(xhr.responseText), RESP_KEYS)); } catch (e) {}
         });
       }
       return _send.apply(this, arguments);
     };
   })();
 
-  /* ---------- chat page language ---------- */
   function applyLang() {
     var s = CHAT_STRINGS[state.lang] || CHAT_STRINGS.si;
     var inp = document.querySelector("textarea, input[type='text'], input:not([type='hidden'])");
@@ -298,7 +291,6 @@
     }
   }
 
-  /* ---------- drawer views ---------- */
   function renderHistoryView(box) {
     box.innerHTML = "";
     var h = loadHist().slice().reverse();
@@ -313,9 +305,8 @@
   }
   function renderContextView(box) {
     box.innerHTML = "";
-    var hint = el("div", "note",
-      "Saved folders are added automatically to every message you send — no need to repeat your purpose. Keep wording clean and purpose-focused.");
-    box.appendChild(hint);
+    box.appendChild(el("div", "note",
+      "Saved folders are added automatically to every message you send — no need to repeat your purpose. Keep wording clean and purpose-focused."));
     var slots = loadCtx();
     for (var i = 0; i < slots.length; i++) (function (i) {
       var card = el("div", "pk-slot");
@@ -342,10 +333,8 @@
     })(i);
   }
 
-  /* ---------- build UI ---------- */
   function buildUI() {
     var toastEl = el("div"); toastEl.id = "pkToast"; document.body.appendChild(toastEl);
-
     var btn = el("button"); btn.id = "pkMenuBtn"; btn.textContent = "☰ Menu ▾";
     var menu = el("div"); menu.id = "pkMenu";
 
@@ -370,7 +359,7 @@
 
     var s3 = el("div", "sec"); s3.appendChild(el("h5", null, "History"));
     var r3 = el("div", "row");
-    r3.appendChild(el("span", null, "Stored on this device only"));
+    r3.appendChild(el("span", null, "No account needed — device only"));
     var bHist = el("button", null, "Open");
     r3.appendChild(bHist); s3.appendChild(r3);
 
@@ -388,7 +377,6 @@
 
     menu.appendChild(s1); menu.appendChild(s2); menu.appendChild(s3); menu.appendChild(s4); menu.appendChild(s5);
     document.body.appendChild(btn); document.body.appendChild(menu);
-
     btn.onclick = function (e) { e.stopPropagation(); menu.classList.toggle("open"); };
     document.addEventListener("click", function (e) {
       if (!menu.contains(e.target) && e.target !== btn) menu.classList.remove("open");
@@ -415,7 +403,6 @@
       menu.classList.remove("open");
     }
     function closeDrawer() { scrim.classList.remove("open"); drawer.classList.remove("open"); }
-
     bHist.onclick = function () { openDrawer("hist"); };
     bCtx.onclick = function () { openDrawer("ctx"); };
     close.onclick = closeDrawer;
@@ -423,7 +410,6 @@
     document.addEventListener("keydown", function (e) { if (e.key === "Escape") { closeDrawer(); menu.classList.remove("open"); } });
   }
 
-  /* ---------- init ---------- */
   function init() {
     buildGlassBg();
     buildUI();
