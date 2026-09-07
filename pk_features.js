@@ -1,6 +1,7 @@
-/* ප්‍රකෘති AI — UI Pack v1.2 (Glass)
-   ☰ dropdown menu · 🔤 font size · 🌏 language · 💾 history drawer · 📌 context folders (3)
-   No dark mode. All data stays in your browser (localStorage). */
+/* ප්‍රකෘති AI — UI Pack v1.3 (Glass Main Theme)
+   ☰ menu · 🔤 font · 🌏 language · 💾 history drawer · 📌 context folders
+   NEW: full-page glassmorphism — gradient bg + glowing spheres + frosted panels
+   All data stays in your browser (localStorage). */
 (function () {
   "use strict";
   if (window.__pkFeaturesLoaded) return;
@@ -16,10 +17,19 @@
     zoom: parseFloat(localStorage.getItem(LS.zoom) || "1") || 1,
     lang: localStorage.getItem(LS.lang) || "si"
   };
-  localStorage.removeItem("pk_theme"); /* dark mode removed */
+  localStorage.removeItem("pk_theme");
 
-  /* ---------- glass CSS ---------- */
+  /* ---------- CSS ---------- */
   var css = [
+    "html,body{min-height:100%!important}",
+    "body{background:linear-gradient(160deg,#0d2a1e 0%,#1c4d38 42%,#7ab294 100%)!important;background-attachment:fixed!important}",
+    "#pkGlassBg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}",
+    "#pkGlassBg .b{position:absolute;border-radius:50%}",
+    "#pkGlassBg .b1{width:46vmax;height:46vmax;left:-12vmax;top:-16vmax;background:radial-gradient(circle at 35% 32%,#41806f,#1d4a3e 68%);opacity:.9;filter:blur(4px)}",
+    "#pkGlassBg .b2{width:36vmax;height:36vmax;right:-11vmax;top:16vh;background:radial-gradient(circle at 35% 35%,#2c6b58,#122f24 75%);opacity:.85;filter:blur(6px)}",
+    "#pkGlassBg .b3{width:32vmax;height:32vmax;left:-9vmax;bottom:-11vmax;background:radial-gradient(circle at 40% 35%,#93d3b8,#3d7a5f 75%);opacity:.8;filter:blur(8px)}",
+    "#pkGlassBg .b4{width:15vmax;height:15vmax;right:12vw;bottom:5vh;background:radial-gradient(circle at 40% 35%,#ffe3a1,#d9a94e 80%);opacity:.5;filter:blur(10px)}",
+    "#pkGlassBg .b5{width:12vmax;height:12vmax;right:22vw;top:6vh;background:radial-gradient(circle at 40% 35%,#a9dcc3,#4d8a6b 80%);opacity:.6;filter:blur(9px)}",
     "#pkMenuBtn{position:fixed;top:10px;right:64px;z-index:99998;display:flex;align-items:center;gap:6px;",
     "padding:7px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.7);",
     "background:rgba(255,255,255,.45);backdrop-filter:blur(14px) saturate(1.5);",
@@ -35,7 +45,7 @@
     "#pkMenu .sec:last-child{border-bottom:none}",
     "#pkMenu h5{margin:0 0 7px;font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:#3d6b50}",
     "#pkMenu .row{display:flex;align-items:center;justify-content:space-between;gap:8px}",
-    "#pkMenu button,.pk-chip{cursor:pointer;border:1px solid rgba(27,94,32,.3);border-radius:9px;",
+    "#pkMenu button{cursor:pointer;border:1px solid rgba(27,94,32,.3);border-radius:9px;",
     "background:rgba(255,255,255,.6);color:#173a26;padding:4px 11px;font:inherit;font-weight:600}",
     "#pkMenu button:hover{background:rgba(232,245,233,.9)}",
     "#pkMenu button:disabled{opacity:.45;cursor:default}",
@@ -52,12 +62,12 @@
     "border-bottom:1px solid rgba(27,94,32,.16)}",
     "#pkDrawer .hd b{font-size:14px}",
     "#pkDrawer .bd{flex:1;overflow-y:auto;padding:12px 14px}",
-    "#pkDrawer .note{color:#4c7a5f;font-size:11.5px;margin:2px 0 10px}",
+    "#pkDrawer .note{color:#3d6b50;font-size:11.5px;margin:2px 0 10px}",
     ".pk-msg{max-width:86%;margin:6px 0;padding:8px 12px;border-radius:12px;line-height:1.5;",
     "white-space:pre-wrap;word-wrap:break-word;clear:both;font-size:13.5px}",
     ".pk-u{background:rgba(27,94,32,.14);border:1px solid rgba(27,94,32,.2);margin-left:auto}",
     ".pk-a{background:rgba(255,255,255,.72);border:1px solid rgba(27,94,32,.14);margin-right:auto}",
-    ".pk-time{font-size:10px;color:#5b8468;clear:both;margin:0 2px 4px}",
+    ".pk-time{font-size:10px;color:#cfe8d8;clear:both;margin:0 2px 4px}",
     ".pk-slot{border:1px solid rgba(27,94,32,.2);border-radius:12px;padding:10px;margin-bottom:10px;background:rgba(255,255,255,.5)}",
     ".pk-slot .nm{font-weight:700;margin-bottom:6px;font-size:12px;color:#245c3a}",
     ".pk-slot input[type=text],.pk-slot textarea{width:100%;box-sizing:border-box;border:1px solid rgba(27,94,32,.28);",
@@ -89,6 +99,54 @@
     document.body.style.zoom = state.zoom === 1 ? "" : String(state.zoom);
     localStorage.setItem(LS.zoom, String(state.zoom));
   }
+  function lum(r, g, b) { return 0.299 * r + 0.587 * g + 0.114 * b; }
+
+  /* ---------- glass background + engine ---------- */
+  function buildGlassBg() {
+    var bg = el("div"); bg.id = "pkGlassBg";
+    bg.innerHTML = '<div class="b b1"></div><div class="b b2"></div><div class="b b3"></div><div class="b b4"></div><div class="b b5"></div>';
+    document.body.appendChild(bg);
+  }
+  function liftContent() {
+    var kids = document.body.children;
+    for (var i = 0; i < kids.length; i++) {
+      var k = kids[i];
+      var t = k.tagName;
+      if (k.id === "pkGlassBg" || t === "SCRIPT" || t === "STYLE" || t === "LINK") continue;
+      var cs; try { cs = getComputedStyle(k); } catch (e) { continue; }
+      if (cs.position === "static") { k.style.position = "relative"; k.style.zIndex = 1; }
+      else { var z = parseInt(cs.zIndex, 10); if (isNaN(z) || z < 1) k.style.zIndex = 1; }
+    }
+  }
+  function glassify(elx) {
+    if (elx.dataset && elx.dataset.pkGlass) return;
+    if (elx.closest && elx.closest("#pkGlassBg,#pkMenu,#pkDrawer,#pkToast,#pkScrim,#pkMenuBtn")) return;
+    var cs; try { cs = getComputedStyle(elx); } catch (e) { return; }
+    var bg = cs.backgroundColor;
+    if (!bg || bg === "rgba(0, 0, 0, 0)") return;
+    var p = bg.match(/[\d.]+/g); if (!p) return;
+    var a = p.length > 3 ? parseFloat(p[3]) : 1;
+    if (a < 0.05) return;
+    var r = +p[0], g = +p[1], b = +p[2], L = lum(r, g, b);
+    elx.dataset.pkGlass = "1";
+    elx.style.backdropFilter = "blur(14px) saturate(1.45)";
+    elx.style.webkitBackdropFilter = "blur(14px) saturate(1.45)";
+    var al = L < 100 ? 0.55 : (L > 210 ? 0.5 : 0.45);
+    elx.style.backgroundColor = "rgba(" + r + "," + g + "," + b + "," + al + ")";
+    if (cs.borderTopStyle !== "none" && parseFloat(cs.borderTopWidth) > 0) {
+      elx.style.borderColor = L < 100 ? "rgba(255,255,255,.4)" : "rgba(255,255,255,.6)";
+    }
+    var w = elx.offsetWidth, h = elx.offsetHeight;
+    var rad = parseFloat(cs.borderTopLeftRadius) || 0;
+    if (w > 140 && h > 50 && rad < 10) elx.style.borderRadius = "14px";
+    if (w > 220) elx.style.boxShadow = "0 10px 34px rgba(8,36,22,.22)";
+  }
+  function scanGlass(root) {
+    if (!root || root.nodeType !== 1) return;
+    glassify(root);
+    var all = root.querySelectorAll("*");
+    for (var i = 0; i < all.length; i++) glassify(all[i]);
+  }
 
   /* ---------- history store ---------- */
   function loadHist() { try { return JSON.parse(localStorage.getItem(LS.hist) || "[]"); } catch (e) { return []; } }
@@ -115,7 +173,7 @@
     return parts.join(" | ");
   }
 
-  /* ---------- network hooks: capture history + inject context ---------- */
+  /* ---------- network hooks ---------- */
   var REQ_KEYS = ["message", "prompt", "text", "q", "content"];
   var RESP_KEYS = ["reply", "response", "output", "text", "answer", "message"];
   function pick(obj, keys) {
@@ -250,7 +308,6 @@
     var btn = el("button"); btn.id = "pkMenuBtn"; btn.textContent = "☰ Menu ▾";
     var menu = el("div"); menu.id = "pkMenu";
 
-    /* font section */
     var s1 = el("div", "sec"); s1.appendChild(el("h5", null, "Font size"));
     var r1 = el("div", "row");
     var bDec = el("button", null, "A−"), bRes = el("button", null, "Reset"), bInc = el("button", null, "A+");
@@ -259,7 +316,6 @@
     bRes.onclick = function () { state.zoom = 1; applyZoom(); };
     r1.appendChild(bDec); r1.appendChild(bRes); r1.appendChild(bInc); s1.appendChild(r1);
 
-    /* language section */
     var s2 = el("div", "sec"); s2.appendChild(el("h5", null, "Language"));
     var r2 = el("div", "row");
     r2.appendChild(el("span", null, "Chat interface"));
@@ -271,21 +327,18 @@
     sel.onchange = function () { state.lang = sel.value; localStorage.setItem(LS.lang, sel.value); applyLang(); };
     r2.appendChild(sel); s2.appendChild(r2);
 
-    /* history section */
     var s3 = el("div", "sec"); s3.appendChild(el("h5", null, "History"));
     var r3 = el("div", "row");
-    var span3 = el("span", null, "Stored on this device only");
+    r3.appendChild(el("span", null, "Stored on this device only"));
     var bHist = el("button", null, "Open");
-    r3.appendChild(span3); r3.appendChild(bHist); s3.appendChild(r3);
+    r3.appendChild(bHist); s3.appendChild(r3);
 
-    /* context folders section */
     var s4 = el("div", "sec"); s4.appendChild(el("h5", null, "Context folders"));
     var r4 = el("div", "row");
-    var span4 = el("span", null, "3 slots · auto-sent");
+    r4.appendChild(el("span", null, "3 slots · auto-sent"));
     var bCtx = el("button", null, "Manage");
-    r4.appendChild(span4); r4.appendChild(bCtx); s4.appendChild(r4);
+    r4.appendChild(bCtx); s4.appendChild(r4);
 
-    /* accounts section (v1.2) */
     var s5 = el("div", "sec");
     var r5 = el("div", "row");
     r5.appendChild(el("span", null, "Accounts"));
@@ -300,7 +353,6 @@
       if (!menu.contains(e.target) && e.target !== btn) menu.classList.remove("open");
     });
 
-    /* drawer + scrim */
     var scrim = el("div"); scrim.id = "pkScrim";
     var drawer = el("div"); drawer.id = "pkDrawer";
     var hd = el("div", "hd");
@@ -330,10 +382,20 @@
     document.addEventListener("keydown", function (e) { if (e.key === "Escape") { closeDrawer(); menu.classList.remove("open"); } });
   }
 
+  /* ---------- init ---------- */
   function init() {
+    buildGlassBg();
     buildUI();
     applyLang();
     if (state.zoom !== 1) applyZoom();
+    liftContent();
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { scanGlass(document.body); });
+    });
+    var pending = null;
+    new MutationObserver(function () {
+      if (!pending) pending = requestAnimationFrame(function () { pending = null; scanGlass(document.body); });
+    }).observe(document.documentElement, { childList: true, subtree: true });
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
