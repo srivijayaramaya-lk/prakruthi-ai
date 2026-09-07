@@ -1,6 +1,6 @@
-/* ප්‍රකෘති AI — UI Pack v1.3.1 (Bright Glass)
+/* ප්‍රකෘති AI — UI Pack v1.3.2 (Milky Glass)
    ☰ menu · 🔤 font · 🌏 language · 💾 history drawer · 📌 context folders
-   Chat area = light frosted glass (matches side background). All data local. */
+   Chat panel = bright milky frosted glass. All data stays in your browser. */
 (function () {
   "use strict";
   if (window.__pkFeaturesLoaded) return;
@@ -119,29 +119,44 @@
   }
   function glassify(elx) {
     if (elx.dataset && elx.dataset.pkGlass) return;
+    if (elx === document.body || elx === document.documentElement) return;
     if (elx.closest && elx.closest("#pkGlassBg,#pkMenu,#pkDrawer,#pkToast,#pkScrim,#pkMenuBtn")) return;
     var cs; try { cs = getComputedStyle(elx); } catch (e) { return; }
     var bg = cs.backgroundColor;
-    if (!bg || bg === "rgba(0, 0, 0, 0)") return;
-    var p = bg.match(/[\d.]+/g); if (!p) return;
-    var a = p.length > 3 ? parseFloat(p[3]) : 1;
-    if (a < 0.05) return;
-    var r = +p[0], g = +p[1], b = +p[2], L = lum(r, g, b);
+    var grad = cs.backgroundImage && cs.backgroundImage !== "none";
+    var hasColor = bg && bg !== "rgba(0, 0, 0, 0)";
+    if (!hasColor && !grad) return;
+    var p = hasColor ? bg.match(/[\d.]+/g) : null;
+    var a = p ? (p.length > 3 ? parseFloat(p[3]) : 1) : 0;
+    if (a < 0.05 && !grad) return;
+    var w = elx.offsetWidth || 0, h = elx.offsetHeight || 0;
+    var bigPanel = w > 280 && h > 220;   /* main chat panel = milky glass */
     elx.dataset.pkGlass = "1";
-    elx.style.backdropFilter = "blur(16px) saturate(1.4)";
-    elx.style.webkitBackdropFilter = "blur(16px) saturate(1.4)";
-    /* light surfaces → bright white frosted glass; dark surfaces (header) keep darker for white text */
+    elx.style.backdropFilter = "blur(22px) saturate(1.45)";
+    elx.style.webkitBackdropFilter = "blur(22px) saturate(1.45)";
+    if (bigPanel) {
+      elx.style.backgroundImage = "none";
+      elx.style.backgroundColor = "rgba(255,255,255,0.55)";
+      elx.style.border = "1px solid rgba(255,255,255,.75)";
+      elx.style.borderRadius = "18px";
+      elx.style.boxShadow = "0 12px 40px rgba(8,36,22,.22)";
+      return;
+    }
+    if (!p) {
+      elx.style.backgroundImage = "none";
+      elx.style.backgroundColor = "rgba(255,255,255,0.4)";
+      return;
+    }
+    var r = +p[0], g = +p[1], b = +p[2], L = lum(r, g, b);
     if (L < 100) {
-      elx.style.backgroundColor = "rgba(" + r + "," + g + "," + b + ",0.5)";
-    } else if (L > 200) {
-      elx.style.backgroundColor = "rgba(255,255,255,0.22)";
+      elx.style.backgroundColor = "rgba(" + r + "," + g + "," + b + ",0.55)";
     } else {
-      elx.style.backgroundColor = "rgba(255,255,255,0.28)";
+      elx.style.backgroundImage = "none";
+      elx.style.backgroundColor = "rgba(255,255,255,0.45)";
     }
     if (cs.borderTopStyle !== "none" && parseFloat(cs.borderTopWidth) > 0) {
       elx.style.borderColor = "rgba(255,255,255,.65)";
     }
-    var w = elx.offsetWidth, h = elx.offsetHeight;
     var rad = parseFloat(cs.borderTopLeftRadius) || 0;
     if (w > 140 && h > 50 && rad < 10) elx.style.borderRadius = "14px";
     if (w > 220) elx.style.boxShadow = "0 10px 34px rgba(8,36,22,.18)";
@@ -189,6 +204,24 @@
       if (obj && typeof obj[keys[i]] === "string" && obj[keys[i]]) return obj[keys[i]];
     return "";
   }
+  function pickDeep(obj, keys) { /* fallback: find longest string anywhere */
+    var v = pick(obj, keys); if (v) return v;
+    var best = "";
+    try {
+      for (var k in obj) {
+        if (typeof obj[k] === "string" && obj[k].length > best.length) best = obj[k];
+        else if (obj[k] && typeof obj[k] === "object") {
+          var inner = pick(obj[k], keys);
+          if (inner && inner.length > best.length) best = inner;
+          else {
+            for (var k2 in obj[k])
+              if (typeof obj[k][k2] === "string" && obj[k][k2].length > best.length) best = obj[k][k2];
+          }
+        }
+      }
+    } catch (e) {}
+    return best;
+  }
   function prepareBody(bodyStr) {
     var obj; try { obj = JSON.parse(bodyStr); } catch (e) { return null; }
     if (!obj || typeof obj !== "object") return null;
@@ -222,7 +255,7 @@
           var u2 = typeof args[0] === "string" ? args[0] : (args[0] && args[0].url) || "";
           var m2 = ((args[1] && args[1].method) || "GET").toUpperCase();
           if (m2 === "POST" && /\/chat/.test(u2))
-            res.clone().json().then(function (d) { addHist("a", pick(d, RESP_KEYS)); }).catch(function () {});
+            res.clone().json().then(function (d) { addHist("a", pickDeep(d, RESP_KEYS)); }).catch(function () {});
         } catch (e) {}
         return res;
       });
@@ -241,7 +274,7 @@
         xhr.addEventListener("load", function () {
           try {
             var d = JSON.parse(xhr.responseText);
-            addHist("a", pick(d, RESP_KEYS));
+            addHist("a", pickDeep(d, RESP_KEYS));
           } catch (e) {}
         });
       }
