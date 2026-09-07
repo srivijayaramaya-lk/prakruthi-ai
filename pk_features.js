@@ -1,5 +1,5 @@
-/* ප්‍රකෘති AI — UI Pack v1.4 (True Frosted Glass)
-   Spheres behind the chat panel → real glass blur visible.
+/* ුෲුුු AI — UI Pack v1.4.1 (Clear Glass)
+   Panel = one bright glass layer; opaque inner layers get cleared.
    ☰ menu · 🔤 font · 🌏 language · 💾 history drawer · 📌 context folders. All data local. */
 (function () {
   "use strict";
@@ -8,7 +8,7 @@
 
   var LS = { zoom: "pk_zoom", lang: "pk_lang", hist: "pk_history", ctx: "pk_ctx" };
   var CHAT_STRINGS = {
-    si: { placeholder: "ඔබේ පණිවිඩය...", send: "යවන්න" },
+    si: { placeholder: "ඔබේ ഫාණිවිඩය...", send: "යවන්්" },
     en: { placeholder: "Your message...", send: "Send" },
     ta: { placeholder: "உங்கள் செய்தி...", send: "அனுப்பு" }
   };
@@ -28,9 +28,9 @@
     "#pkGlassBg .b3{width:32vmax;height:32vmax;left:-9vmax;bottom:-11vmax;background:radial-gradient(circle at 40% 35%,#93d3b8,#3d7a5f 75%);opacity:.8;filter:blur(8px)}",
     "#pkGlassBg .b4{width:15vmax;height:15vmax;right:12vw;bottom:5vh;background:radial-gradient(circle at 40% 35%,#ffe3a1,#d9a94e 80%);opacity:.5;filter:blur(10px)}",
     "#pkGlassBg .b5{width:12vmax;height:12vmax;right:22vw;top:6vh;background:radial-gradient(circle at 40% 35%,#a9dcc3,#4d8a6b 80%);opacity:.6;filter:blur(9px)}",
-    "#pkGlassBg .b6{width:30vmax;height:30vmax;left:24vw;top:28vh;background:radial-gradient(circle at 38% 34%,#8fd0b4,#3f7d60 72%);opacity:.75;filter:blur(7px)}",
-    "#pkGlassBg .b7{width:26vmax;height:26vmax;right:25vw;top:6vh;background:radial-gradient(circle at 36% 34%,#2c6b58,#12352a 75%);opacity:.7;filter:blur(8px)}",
-    "#pkGlassBg .b8{width:22vmax;height:22vmax;left:38vw;bottom:-9vh;background:radial-gradient(circle at 40% 35%,#ffe9b8,#cfa64f 78%);opacity:.45;filter:blur(11px)}",
+    "#pkGlassBg .b6{width:38vmax;height:38vmax;left:28vw;top:10vh;background:radial-gradient(circle at 38% 34%,#8fd0b4,#3f7d60 72%);opacity:.8;filter:blur(5px)}",
+    "#pkGlassBg .b7{width:30vmax;height:30vmax;left:46vw;top:46vh;background:radial-gradient(circle at 36% 34%,#2c6b58,#12352a 75%);opacity:.7;filter:blur(6px)}",
+    "#pkGlassBg .b8{width:24vmax;height:24vmax;left:34vw;bottom:-6vh;background:radial-gradient(circle at 40% 35%,#ffe9b8,#cfa64f 78%);opacity:.5;filter:blur(9px)}",
     "#pkMenuBtn{position:fixed;top:10px;right:64px;z-index:99998;display:flex;align-items:center;gap:6px;",
     "padding:7px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.7);",
     "background:rgba(255,255,255,.45);backdrop-filter:blur(14px) saturate(1.5);",
@@ -120,16 +120,38 @@
   function ancestorGlassed(elx) {
     var p = elx.parentElement;
     while (p && p !== document.body) {
-      if (p.dataset && p.dataset.pkGlass) return true;
+      if (p.dataset && p.dataset.pkGlass === "1") return true;
       p = p.parentElement;
     }
     return false;
+  }
+  /* inner opaque layers must NOT block the glass — make them pass-through */
+  function childClear(elx) {
+    if (elx.dataset && elx.dataset.pkGlass) return;
+    var cs; try { cs = getComputedStyle(elx); } catch (e) { return; }
+    var bg = cs.backgroundColor;
+    if (!bg || bg === "rgba(0, 0, 0, 0)") return;
+    var p = bg.match(/[\d.]+/g); if (!p) return;
+    var a = p.length > 3 ? parseFloat(p[3]) : 1;
+    if (a < 0.6) return;
+    var r = +p[0], g = +p[1], b = +p[2], L = lum(r, g, b);
+    elx.dataset.pkGlass = "child";
+    elx.style.setProperty("backdrop-filter", "blur(10px) saturate(1.2)", "important");
+    elx.style.setProperty("-webkit-backdrop-filter", "blur(10px) saturate(1.2)", "important");
+    if (L < 120) {
+      /* dark inner layer (header) → dark frosted, white text stays readable */
+      elx.style.setProperty("background-color", "rgba(" + r + "," + g + "," + b + ",0.55)", "important");
+    } else {
+      /* light inner layer → nearly clear so spheres show through */
+      elx.style.setProperty("background-image", "none", "important");
+      elx.style.setProperty("background-color", "rgba(255,255,255,0.12)", "important");
+    }
   }
   function glassify(elx) {
     if (elx.dataset && elx.dataset.pkGlass) return;
     if (elx === document.body || elx === document.documentElement) return;
     if (elx.closest && elx.closest("#pkGlassBg,#pkMenu,#pkDrawer,#pkToast,#pkScrim,#pkMenuBtn")) return;
-    if (ancestorGlassed(elx)) return;
+    if (ancestorGlassed(elx)) { childClear(elx); return; }
     var cs; try { cs = getComputedStyle(elx); } catch (e) { return; }
     var bg = cs.backgroundColor;
     var grad = cs.backgroundImage && cs.backgroundImage !== "none";
@@ -143,15 +165,16 @@
     var r = p ? +p[0] : 255, g = p ? +p[1] : 255, b = p ? +p[2] : 255;
     var L = lum(r, g, b);
     elx.dataset.pkGlass = "1";
-    elx.style.setProperty("backdrop-filter", "blur(28px) saturate(1.25)", "important");
-    elx.style.setProperty("-webkit-backdrop-filter", "blur(28px) saturate(1.25)", "important");
+    elx.style.setProperty("backdrop-filter", "blur(16px) saturate(1.2)", "important");
+    elx.style.setProperty("-webkit-backdrop-filter", "blur(16px) saturate(1.2)", "important");
     if (bigPanel) {
+      /* main chat panel → one bright glass layer, spheres visible inside */
       elx.style.setProperty("background-image", "none", "important");
-      elx.style.setProperty("background-color", "rgba(255,255,255,0.42)", "important");
-      elx.style.setProperty("border", "1px solid rgba(255,255,255,.8)", "important");
+      elx.style.setProperty("background-color", "rgba(255,255,255,0.30)", "important");
+      elx.style.setProperty("border", "1.5px solid rgba(255,255,255,.8)", "important");
       elx.style.setProperty("border-radius", "20px", "important");
       elx.style.setProperty("box-shadow",
-        "inset 0 1px 0 rgba(255,255,255,.55), 0 12px 40px rgba(8,36,22,.28)", "important");
+        "inset 0 1px 0 rgba(255,255,255,.55), 0 14px 44px rgba(8,36,22,.3)", "important");
       return;
     }
     if (L < 100) {
@@ -159,7 +182,7 @@
       elx.style.setProperty("border-color", "rgba(255,255,255,.4)", "important");
     } else {
       elx.style.setProperty("background-image", "none", "important");
-      elx.style.setProperty("background-color", "rgba(255,255,255,0.5)", "important");
+      elx.style.setProperty("background-color", "rgba(255,255,255,0.45)", "important");
       if (cs.borderTopStyle !== "none" && parseFloat(cs.borderTopWidth) > 0)
         elx.style.setProperty("border-color", "rgba(255,255,255,.7)", "important");
       var rad = parseFloat(cs.borderTopLeftRadius) || 0;
