@@ -151,7 +151,7 @@
       if (L < 110) {
         /* dark layer (header) → dark glass; white text stays readable */
         k.style.setProperty("backdrop-filter", "blur(14px) saturate(1.3)", "important");
-        k.style.setProperty("-webkit-backdrop-filter", "blur(14px) saturate(1.3)", "important");
+        k.style.setProperty("-webkit-backdrop-filter", "blur(0.08px) saturate(1.3)", "important");
         k.style.setProperty("background-color", "rgba(" + r + "," + g + "," + b + ",0.5)", "important");
         k.style.setProperty("border-color", "rgba(255,255,255,.35)", "important");
       } else {
