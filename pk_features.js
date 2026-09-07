@@ -1,7 +1,6 @@
-/* ප්‍රකෘති AI — UI Pack v1.3 (Glass Main Theme)
+/* ප්‍රකෘති AI — UI Pack v1.3.1 (Bright Glass)
    ☰ menu · 🔤 font · 🌏 language · 💾 history drawer · 📌 context folders
-   NEW: full-page glassmorphism — gradient bg + glowing spheres + frosted panels
-   All data stays in your browser (localStorage). */
+   Chat area = light frosted glass (matches side background). All data local. */
 (function () {
   "use strict";
   if (window.__pkFeaturesLoaded) return;
@@ -53,8 +52,8 @@
     "#pkScrim{position:fixed;inset:0;z-index:99998;background:rgba(10,35,20,.22);display:none}",
     "#pkScrim.open{display:block}",
     "#pkDrawer{position:fixed;top:0;right:-380px;width:350px;max-width:94vw;height:100%;z-index:100000;",
-    "display:flex;flex-direction:column;background:rgba(248,252,249,.82);",
-    "backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px) saturate(1.5);",
+    "display:flex;flex-direction:column;background:rgba(250,253,251,.7);",
+    "backdrop-filter:blur(22px) saturate(1.5);-webkit-backdrop-filter:blur(22px) saturate(1.5);",
     "border-left:1px solid rgba(255,255,255,.75);box-shadow:-14px 0 44px rgba(11,60,35,.28);",
     "transition:right .28s ease;color:#173a26;font-size:13px}",
     "#pkDrawer.open{right:0}",
@@ -67,7 +66,7 @@
     "white-space:pre-wrap;word-wrap:break-word;clear:both;font-size:13.5px}",
     ".pk-u{background:rgba(27,94,32,.14);border:1px solid rgba(27,94,32,.2);margin-left:auto}",
     ".pk-a{background:rgba(255,255,255,.72);border:1px solid rgba(27,94,32,.14);margin-right:auto}",
-    ".pk-time{font-size:10px;color:#cfe8d8;clear:both;margin:0 2px 4px}",
+    ".pk-time{font-size:10px;color:#3d6b50;clear:both;margin:0 2px 4px}",
     ".pk-slot{border:1px solid rgba(27,94,32,.2);border-radius:12px;padding:10px;margin-bottom:10px;background:rgba(255,255,255,.5)}",
     ".pk-slot .nm{font-weight:700;margin-bottom:6px;font-size:12px;color:#245c3a}",
     ".pk-slot input[type=text],.pk-slot textarea{width:100%;box-sizing:border-box;border:1px solid rgba(27,94,32,.28);",
@@ -129,17 +128,23 @@
     if (a < 0.05) return;
     var r = +p[0], g = +p[1], b = +p[2], L = lum(r, g, b);
     elx.dataset.pkGlass = "1";
-    elx.style.backdropFilter = "blur(14px) saturate(1.45)";
-    elx.style.webkitBackdropFilter = "blur(14px) saturate(1.45)";
-    var al = L < 100 ? 0.55 : (L > 210 ? 0.5 : 0.45);
-    elx.style.backgroundColor = "rgba(" + r + "," + g + "," + b + "," + al + ")";
+    elx.style.backdropFilter = "blur(16px) saturate(1.4)";
+    elx.style.webkitBackdropFilter = "blur(16px) saturate(1.4)";
+    /* light surfaces → bright white frosted glass; dark surfaces (header) keep darker for white text */
+    if (L < 100) {
+      elx.style.backgroundColor = "rgba(" + r + "," + g + "," + b + ",0.5)";
+    } else if (L > 200) {
+      elx.style.backgroundColor = "rgba(255,255,255,0.22)";
+    } else {
+      elx.style.backgroundColor = "rgba(255,255,255,0.28)";
+    }
     if (cs.borderTopStyle !== "none" && parseFloat(cs.borderTopWidth) > 0) {
-      elx.style.borderColor = L < 100 ? "rgba(255,255,255,.4)" : "rgba(255,255,255,.6)";
+      elx.style.borderColor = "rgba(255,255,255,.65)";
     }
     var w = elx.offsetWidth, h = elx.offsetHeight;
     var rad = parseFloat(cs.borderTopLeftRadius) || 0;
     if (w > 140 && h > 50 && rad < 10) elx.style.borderRadius = "14px";
-    if (w > 220) elx.style.boxShadow = "0 10px 34px rgba(8,36,22,.22)";
+    if (w > 220) elx.style.boxShadow = "0 10px 34px rgba(8,36,22,.18)";
   }
   function scanGlass(root) {
     if (!root || root.nodeType !== 1) return;
@@ -167,8 +172,11 @@
   function activeCtxText() {
     var a = loadCtx(), parts = [];
     for (var i = 0; i < a.length; i++) {
-      if (a[i].on && a[i].content && a[i].content.trim())
-        parts.push((a[i].name && a[i].name.trim() ? a[i].name.trim() : "Folder " + (i + 1)) + ": " + a[i].content.trim());
+      if (!a[i].on) continue;
+      var nm = (a[i].name || "").trim();
+      var ct = (a[i].content || "").trim();
+      var txt = ct || nm; /* either box works */
+      if (txt) parts.push((nm && ct) ? nm + ": " + ct : txt);
     }
     return parts.join(" | ");
   }
