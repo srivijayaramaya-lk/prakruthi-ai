@@ -1,160 +1,162 @@
-/* ප්‍රකෘති AI — UI Feature Pack v1.1
-   🌙 dark · 🔤 font size · 🌏 UI language · 💾 on-device history
-   සියල්ල localStorage — server එකට අමතර දත්ත යන්නේ නෑ. */
+/* ප්‍රකෘති AI — UI Pack v1.2 (Glass)
+   ☰ dropdown menu · 🔤 font size · 🌏 language · 💾 history drawer · 📌 context folders (3)
+   No dark mode. All data stays in your browser (localStorage). */
 (function () {
   "use strict";
   if (window.__pkFeaturesLoaded) return;
   window.__pkFeaturesLoaded = true;
 
-  var LS = { theme: "pk_theme", zoom: "pk_zoom", lang: "pk_lang", hist: "pk_history" };
+  var LS = { zoom: "pk_zoom", lang: "pk_lang", hist: "pk_history", ctx: "pk_ctx" };
+  var CHAT_STRINGS = {
+    si: { placeholder: "ඔබේ පණිවිඩය...", send: "යවන්න" },
+    en: { placeholder: "Your message...", send: "Send" },
+    ta: { placeholder: "உங்கள் செய்தி...", send: "அனுப்பு" }
+  };
   var state = {
-    dark: localStorage.getItem(LS.theme) === "dark",
     zoom: parseFloat(localStorage.getItem(LS.zoom) || "1") || 1,
     lang: localStorage.getItem(LS.lang) || "si"
   };
+  localStorage.removeItem("pk_theme"); /* dark mode removed */
 
-  var I18N = {
-    si: { settings: "අභිරුචි", dark: "අඳුරු පෙනුම", size: "අකුරු ප්‍රමාණය",
-          lang: "භාෂාව", placeholder: "ඔබේ පණිවිඩය...", send: "යවන්න",
-          histTitle: "පරණ සංවාදය — ඔබේ උපකරණයේම සුරැකෙනවා",
-          clear: "ඉතිහාසය මකන්න", clearAsk: "ඉතිහාසය මකලා දමන්නද?" },
-    en: { settings: "Settings", dark: "Dark mode", size: "Font size",
-          lang: "Language", placeholder: "Your message...", send: "Send",
-          histTitle: "Previous chat — stored on your device only",
-          clear: "Clear history", clearAsk: "Clear history?" },
-    ta: { settings: "அமைப்புகள்", dark: "இருண்ட தோற்றம்", size: "எழுத்து அளவு",
-          lang: "மொழி", placeholder: "உங்கள் செய்தி...", send: "அனுப்பு",
-          histTitle: "பழைய உரையாடல் — உங்கள் சாதனத்தில் மட்டும்",
-          clear: "வரலாறு அழி", clearAsk: "வரலாற்றை அழிக்கவா?" }
-  };
-
+  /* ---------- glass CSS ---------- */
   var css = [
-    "#pkBtn{position:fixed;top:8px;right:10px;z-index:99999;background:#1b5e20;color:#ffd97a;",
-    "border:1px solid #2e7d32;border-radius:50%;width:38px;height:38px;font-size:18px;cursor:pointer;",
-    "box-shadow:0 2px 8px rgba(0,0,0,.35)}",
-    "#pkPanel{position:fixed;top:54px;right:10px;z-index:99999;background:#fff;color:#1b3a24;",
-    "border:1px solid #2e7d32;border-radius:12px;padding:12px 14px;width:230px;display:none;",
-    "box-shadow:0 8px 24px rgba(0,0,0,.3);font-size:13px}",
-    "#pkPanel.open{display:block}",
-    "#pkPanel h4{margin:0 0 8px;font-size:14px;color:#1b5e20}",
-    "#pkPanel .row{display:flex;align-items:center;justify-content:space-between;margin:9px 0}",
-    "#pkPanel button{cursor:pointer;border:1px solid #2e7d32;background:#e8f5e9;border-radius:6px;padding:2px 9px}",
-    "#pkPanel .full{width:100%;margin-top:8px;padding:6px}",
-    "#pkLang{border:1px solid #2e7d32;border-radius:6px;padding:2px 4px;background:#fff}",
-    "html.pk-dark #pkPanel{background:#10241a;color:#cfe8d8}",
-    "html.pk-dark #pkPanel h4{color:#ffd97a}",
-    "html.pk-dark #pkPanel button,html.pk-dark #pkLang{background:#1b3a24;color:#cfe8d8;border-color:#2e7d32}",
-    ".pk-hist-label{text-align:center;font-size:12px;color:#6b8f77;margin:12px 0 4px}",
-    ".pk-msg{max-width:78%;margin:6px 12px;padding:8px 12px;border-radius:12px;font-size:15px;",
-    "line-height:1.5;white-space:pre-wrap;word-wrap:break-word;clear:both}",
-    ".pk-user{background:#1b5e20;color:#fff;margin-left:auto}",
-    ".pk-ai{background:#fff;color:#1b3a24;border:1px solid #cde5d2;margin-right:auto}",
-    "html.pk-dark .pk-ai{background:#122019;color:#d7ead8;border-color:#264a35}"
+    "#pkMenuBtn{position:fixed;top:10px;right:64px;z-index:99998;display:flex;align-items:center;gap:6px;",
+    "padding:7px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.7);",
+    "background:rgba(255,255,255,.45);backdrop-filter:blur(14px) saturate(1.5);",
+    "-webkit-backdrop-filter:blur(14px) saturate(1.5);color:#173a26;font-size:13px;font-weight:600;",
+    "cursor:pointer;box-shadow:0 4px 18px rgba(11,60,35,.18)}",
+    "#pkMenuBtn:hover{background:rgba(255,255,255,.62)}",
+    "#pkMenu{position:fixed;top:50px;right:64px;z-index:99999;width:256px;display:none;border-radius:16px;",
+    "border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.62);",
+    "backdrop-filter:blur(18px) saturate(1.6);-webkit-backdrop-filter:blur(18px) saturate(1.6);",
+    "color:#173a26;font-size:13px;box-shadow:0 12px 34px rgba(11,60,35,.25);overflow:hidden}",
+    "#pkMenu.open{display:block}",
+    "#pkMenu .sec{padding:10px 14px;border-bottom:1px solid rgba(27,94,32,.14)}",
+    "#pkMenu .sec:last-child{border-bottom:none}",
+    "#pkMenu h5{margin:0 0 7px;font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:#3d6b50}",
+    "#pkMenu .row{display:flex;align-items:center;justify-content:space-between;gap:8px}",
+    "#pkMenu button,.pk-chip{cursor:pointer;border:1px solid rgba(27,94,32,.3);border-radius:9px;",
+    "background:rgba(255,255,255,.6);color:#173a26;padding:4px 11px;font:inherit;font-weight:600}",
+    "#pkMenu button:hover{background:rgba(232,245,233,.9)}",
+    "#pkMenu button:disabled{opacity:.45;cursor:default}",
+    "#pkLangSel{border:1px solid rgba(27,94,32,.3);border-radius:9px;padding:3px 6px;background:rgba(255,255,255,.75);color:#173a26;font:inherit}",
+    "#pkScrim{position:fixed;inset:0;z-index:99998;background:rgba(10,35,20,.22);display:none}",
+    "#pkScrim.open{display:block}",
+    "#pkDrawer{position:fixed;top:0;right:-380px;width:350px;max-width:94vw;height:100%;z-index:100000;",
+    "display:flex;flex-direction:column;background:rgba(248,252,249,.82);",
+    "backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px) saturate(1.5);",
+    "border-left:1px solid rgba(255,255,255,.75);box-shadow:-14px 0 44px rgba(11,60,35,.28);",
+    "transition:right .28s ease;color:#173a26;font-size:13px}",
+    "#pkDrawer.open{right:0}",
+    "#pkDrawer .hd{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;",
+    "border-bottom:1px solid rgba(27,94,32,.16)}",
+    "#pkDrawer .hd b{font-size:14px}",
+    "#pkDrawer .bd{flex:1;overflow-y:auto;padding:12px 14px}",
+    "#pkDrawer .note{color:#4c7a5f;font-size:11.5px;margin:2px 0 10px}",
+    ".pk-msg{max-width:86%;margin:6px 0;padding:8px 12px;border-radius:12px;line-height:1.5;",
+    "white-space:pre-wrap;word-wrap:break-word;clear:both;font-size:13.5px}",
+    ".pk-u{background:rgba(27,94,32,.14);border:1px solid rgba(27,94,32,.2);margin-left:auto}",
+    ".pk-a{background:rgba(255,255,255,.72);border:1px solid rgba(27,94,32,.14);margin-right:auto}",
+    ".pk-time{font-size:10px;color:#5b8468;clear:both;margin:0 2px 4px}",
+    ".pk-slot{border:1px solid rgba(27,94,32,.2);border-radius:12px;padding:10px;margin-bottom:10px;background:rgba(255,255,255,.5)}",
+    ".pk-slot .nm{font-weight:700;margin-bottom:6px;font-size:12px;color:#245c3a}",
+    ".pk-slot input[type=text],.pk-slot textarea{width:100%;box-sizing:border-box;border:1px solid rgba(27,94,32,.28);",
+    "border-radius:8px;padding:6px 8px;font:inherit;background:rgba(255,255,255,.8);color:#173a26;margin-bottom:6px}",
+    ".pk-slot textarea{min-height:70px;resize:vertical}",
+    ".pk-slot .ops{display:flex;align-items:center;gap:8px;font-size:12px}",
+    "#pkToast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:100001;display:none;",
+    "padding:8px 18px;border-radius:999px;background:rgba(27,94,32,.88);color:#fff;font-size:13px;",
+    "box-shadow:0 6px 22px rgba(0,0,0,.25)}"
   ].join("");
   var styleEl = document.createElement("style");
   styleEl.textContent = css;
   document.head.appendChild(styleEl);
 
-  /* ---------- 🌙 dark engine (palette scan) ---------- */
-  function lum(r, g, b) { return 0.299 * r + 0.587 * g + 0.114 * b; }
-
-  function processEl(el) {
-    if (!el || el.nodeType !== 1) return;
-    if (el.id === "pkBtn" || el.id === "pkPanel") return;
-    if (el.closest && el.closest("#pkBtn,#pkPanel")) return;
-    var cs; try { cs = getComputedStyle(el); } catch (e) { return; }
-    var bg = cs.backgroundColor;
-    if (bg && bg !== "rgba(0, 0, 0, 0)" && !el.dataset.pkBg) {
-      var p = bg.match(/[\d.]+/g);
-      if (p) {
-        var a = p.length > 3 ? parseFloat(p[3]) : 1;
-        if (a > 0.05 && lum(+p[0], +p[1], +p[2]) > 110) {
-          el.dataset.pkBg = bg;
-          el.style.backgroundColor = "#122019";
-        }
-      }
-    }
-    if (!el.dataset.pkFg) {
-      var q = cs.color && cs.color.match(/\d+/g);
-      if (q && lum(+q[0], +q[1], +q[2]) < 100) {
-        el.dataset.pkFg = cs.color;
-        el.style.color = "#d7ead8";
-      }
-    }
+  /* ---------- helpers ---------- */
+  function el(tag, cls, txt) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (txt != null) e.textContent = txt;
+    return e;
   }
-  function scan(root) {
-    if (!root || root.nodeType !== 1) return;
-    processEl(root);
-    var all = root.querySelectorAll("*");
-    for (var i = 0; i < all.length; i++) processEl(all[i]);
+  function toast(msg) {
+    var t = document.getElementById("pkToast");
+    t.textContent = msg; t.style.display = "block";
+    clearTimeout(t.__h);
+    t.__h = setTimeout(function () { t.style.display = "none"; }, 1800);
   }
-  function enableDark() {
-    state.dark = true;
-    document.documentElement.classList.add("pk-dark");
-    if (!document.documentElement.dataset.pkHtmlBg) {
-      document.documentElement.dataset.pkHtmlBg = "1";
-      document.documentElement.style.backgroundColor = "#0f1712";
-    }
-    scan(document.body);
-    localStorage.setItem(LS.theme, "dark");
-    var b = document.getElementById("pkDark"); if (b) b.textContent = "☀️";
-  }
-  function disableDark() {
-    state.dark = false;
-    document.documentElement.classList.remove("pk-dark");
-    if (document.documentElement.dataset.pkHtmlBg) {
-      delete document.documentElement.dataset.pkHtmlBg;
-      document.documentElement.style.backgroundColor = "";
-    }
-    var bgs = document.querySelectorAll("[data-pk-bg]");
-    for (var i = 0; i < bgs.length; i++) { bgs[i].style.backgroundColor = bgs[i].dataset.pkBg; delete bgs[i].dataset.pkBg; }
-    var fgs = document.querySelectorAll("[data-pk-fg]");
-    for (var j = 0; j < fgs.length; j++) { fgs[j].style.color = fgs[j].dataset.pkFg; delete fgs[j].dataset.pkFg; }
-    localStorage.setItem(LS.theme, "light");
-    var b = document.getElementById("pkDark"); if (b) b.textContent = "🌙";
-  }
-  new MutationObserver(function (muts) {
-    if (!state.dark) return;
-    for (var i = 0; i < muts.length; i++) {
-      var added = muts[i].addedNodes;
-      for (var j = 0; j < added.length; j++) if (added[j].nodeType === 1) scan(added[j]);
-    }
-  }).observe(document.documentElement, { childList: true, subtree: true });
-
-  /* ---------- 🔤 zoom ---------- */
   function applyZoom() {
     document.body.style.zoom = state.zoom === 1 ? "" : String(state.zoom);
     localStorage.setItem(LS.zoom, String(state.zoom));
   }
 
-  /* ---------- 💾 history (fetch + XHR hooks) ---------- */
+  /* ---------- history store ---------- */
   function loadHist() { try { return JSON.parse(localStorage.getItem(LS.hist) || "[]"); } catch (e) { return []; } }
   function addHist(role, text) {
     if (!text || typeof text !== "string") return;
     var h = loadHist(); h.push({ r: role, t: text.slice(0, 2000), ts: Date.now() });
     try { localStorage.setItem(LS.hist, JSON.stringify(h.slice(-60))); } catch (e) {}
   }
+
+  /* ---------- context folders ---------- */
+  function loadCtx() {
+    var a; try { a = JSON.parse(localStorage.getItem(LS.ctx) || "[]"); } catch (e) { a = []; }
+    if (!Array.isArray(a)) a = [];
+    while (a.length < 3) a.push({ name: "", content: "", on: false });
+    return a.slice(0, 3);
+  }
+  function saveCtx(a) { localStorage.setItem(LS.ctx, JSON.stringify(a)); }
+  function activeCtxText() {
+    var a = loadCtx(), parts = [];
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].on && a[i].content && a[i].content.trim())
+        parts.push((a[i].name && a[i].name.trim() ? a[i].name.trim() : "Folder " + (i + 1)) + ": " + a[i].content.trim());
+    }
+    return parts.join(" | ");
+  }
+
+  /* ---------- network hooks: capture history + inject context ---------- */
+  var REQ_KEYS = ["message", "prompt", "text", "q", "content"];
+  var RESP_KEYS = ["reply", "response", "output", "text", "answer", "message"];
   function pick(obj, keys) {
-    for (var i = 0; i < keys.length; i++) if (obj && typeof obj[keys[i]] === "string" && obj[keys[i]]) return obj[keys[i]];
+    for (var i = 0; i < keys.length; i++)
+      if (obj && typeof obj[keys[i]] === "string" && obj[keys[i]]) return obj[keys[i]];
     return "";
+  }
+  function prepareBody(bodyStr) {
+    var obj; try { obj = JSON.parse(bodyStr); } catch (e) { return null; }
+    if (!obj || typeof obj !== "object") return null;
+    for (var i = 0; i < REQ_KEYS.length; i++) {
+      var k = REQ_KEYS[i];
+      if (typeof obj[k] === "string" && obj[k]) {
+        var orig = obj[k];
+        addHist("u", orig);
+        var ctx = activeCtxText();
+        if (ctx) obj[k] = "[Context — applies to all my messages: " + ctx + "]\n" + orig;
+        return JSON.stringify(obj);
+      }
+    }
+    return null;
   }
   var _fetch = window.fetch;
   if (_fetch) {
     window.fetch = function () {
-      var args = arguments;
+      var args = [].slice.call(arguments);
+      try {
+        var url = typeof args[0] === "string" ? args[0] : (args[0] && args[0].url) || "";
+        var opts = args[1] = args[1] || {};
+        var method = (opts.method || (args[0] && args[0].method) || "GET").toUpperCase();
+        if (method === "POST" && /\/chat/.test(url) && typeof opts.body === "string") {
+          var nb = prepareBody(opts.body);
+          if (nb) opts.body = nb;
+        }
+      } catch (e) {}
       return _fetch.apply(this, args).then(function (res) {
         try {
-          var url = (typeof args[0] === "string") ? args[0] : (args[0] && args[0].url) || "";
-          var opts = args[1] || {};
-          var method = (opts.method || (args[0] && args[0].method) || "GET").toUpperCase();
-          if (method === "POST" && /\/chat/.test(url)) {
-            var req = {};
-            try { req = typeof opts.body === "string" ? JSON.parse(opts.body) : {}; } catch (e) {}
-            addHist("u", pick(req, ["message", "prompt", "text", "q", "content"]));
-            res.clone().json().then(function (data) {
-              addHist("a", pick(data, ["reply", "response", "output", "text", "answer", "message"]));
-            }).catch(function () {});
-          }
+          var u2 = typeof args[0] === "string" ? args[0] : (args[0] && args[0].url) || "";
+          var m2 = ((args[1] && args[1].method) || "GET").toUpperCase();
+          if (m2 === "POST" && /\/chat/.test(u2))
+            res.clone().json().then(function (d) { addHist("a", pick(d, RESP_KEYS)); }).catch(function () {});
         } catch (e) {}
         return res;
       });
@@ -168,13 +170,12 @@
     };
     XMLHttpRequest.prototype.send = function (body) {
       var xhr = this;
-      if (xhr.__pkChat) {
+      if (xhr.__pkChat && typeof body === "string") {
+        var nb = prepareBody(body); if (nb) body = nb;
         xhr.addEventListener("load", function () {
           try {
-            var req = typeof body === "string" ? JSON.parse(body) : {};
-            addHist("u", pick(req, ["message", "prompt", "text", "q", "content"]));
-            var data = JSON.parse(xhr.responseText);
-            addHist("a", pick(data, ["reply", "response", "output", "text", "answer", "message"]));
+            var d = JSON.parse(xhr.responseText);
+            addHist("a", pick(d, RESP_KEYS));
           } catch (e) {}
         });
       }
@@ -182,86 +183,157 @@
     };
   })();
 
-  function findScroller(el) {
-    while (el && el !== document.body) {
-      var cs = getComputedStyle(el);
-      if ((cs.overflowY === "auto" || cs.overflowY === "scroll") && el.scrollHeight > el.clientHeight + 40) return el;
-      el = el.parentElement;
-    }
-    return null;
-  }
-  function renderHist() {
-    var h = loadHist().slice(-20);
-    if (!h.length) return;
-    var t = I18N[state.lang] || I18N.si;
-    var inp = document.querySelector("textarea, input[type='text'], input:not([type='hidden'])");
-    if (!inp) return;
-    var box = document.createElement("div"); box.id = "pkHist";
-    var lbl = document.createElement("div"); lbl.className = "pk-hist-label";
-    lbl.textContent = "── " + t.histTitle + " ──"; box.appendChild(lbl);
-    for (var i = 0; i < h.length; i++) {
-      var d = document.createElement("div");
-      d.className = "pk-msg " + (h[i].r === "u" ? "pk-user" : "pk-ai");
-      d.textContent = h[i].t; box.appendChild(d);
-    }
-    var sc = findScroller(inp), form = inp.closest("form");
-    if (sc) sc.insertBefore(box, sc.firstChild);
-    else (form || inp).parentElement.insertBefore(box, form || inp);
-  }
-
-  /* ---------- 🌏 language ---------- */
+  /* ---------- chat page language ---------- */
   function applyLang() {
-    var t = I18N[state.lang] || I18N.si;
+    var s = CHAT_STRINGS[state.lang] || CHAT_STRINGS.si;
     var inp = document.querySelector("textarea, input[type='text'], input:not([type='hidden'])");
-    if (inp) inp.placeholder = t.placeholder;
+    if (inp) inp.placeholder = s.placeholder;
     var btns = document.querySelectorAll("button, input[type='submit']");
     for (var i = 0; i < btns.length; i++) {
       var b = btns[i];
-      if (b.id === "pkBtn" || (b.closest && b.closest("#pkPanel"))) continue;
-      if (/යවන්න|send|அனுப்பு/i.test(b.textContent || "")) { b.textContent = t.send; break; }
+      if (b.id === "pkMenuBtn" || (b.closest && b.closest("#pkMenu,#pkDrawer"))) continue;
+      if (/යවන්න|send|அனுப்பு/i.test((b.textContent || b.value || ""))) {
+        if (b.tagName === "INPUT") b.value = s.send; else b.textContent = s.send;
+        break;
+      }
     }
-    var lbl = document.querySelector("#pkHist .pk-hist-label");
-    if (lbl) lbl.textContent = "── " + t.histTitle + " ──";
-    document.getElementById("pkT1").textContent = t.settings;
-    document.getElementById("pkT2").textContent = t.dark;
-    document.getElementById("pkT3").textContent = t.size;
-    document.getElementById("pkT4").textContent = t.lang;
-    document.getElementById("pkClear").textContent = "🗑 " + t.clear;
   }
 
-  /* ---------- panel ---------- */
-  function buildPanel() {
-    var btn = document.createElement("button");
-    btn.id = "pkBtn"; btn.textContent = "🎨"; btn.title = "Prakruthi settings";
-    var panel = document.createElement("div"); panel.id = "pkPanel";
-    panel.innerHTML =
-      '<h4 id="pkT1"></h4>' +
-      '<div class="row"><span id="pkT2"></span><button id="pkDark"></button></div>' +
-      '<div class="row"><span id="pkT3"></span><span><button id="pkMinus">A−</button> <button id="pkPlus">A+</button></span></div>' +
-      '<div class="row"><span id="pkT4"></span><select id="pkLang"><option value="si">සිං</option><option value="en">EN</option><option value="ta">தமிழ்</option></select></div>' +
-      '<button class="full" id="pkClear"></button>';
-    document.body.appendChild(btn);
-    document.body.appendChild(panel);
-    btn.onclick = function () { panel.classList.toggle("open"); };
-    document.getElementById("pkDark").onclick = function () { state.dark ? disableDark() : enableDark(); };
-    document.getElementById("pkMinus").onclick = function () { state.zoom = Math.max(0.8, Math.round((state.zoom - 0.1) * 10) / 10); applyZoom(); };
-    document.getElementById("pkPlus").onclick = function () { state.zoom = Math.min(1.5, Math.round((state.zoom + 0.1) * 10) / 10); applyZoom(); };
-    var sel = document.getElementById("pkLang");
+  /* ---------- drawer views ---------- */
+  function renderHistoryView(box) {
+    box.innerHTML = "";
+    var h = loadHist().slice().reverse();
+    if (!h.length) { box.appendChild(el("div", "note", "No saved messages yet.")); return; }
+    for (var i = 0; i < h.length; i++) {
+      var d = new Date(h[i].ts);
+      box.appendChild(el("div", "pk-time",
+        d.toLocaleDateString() + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) +
+        (h[i].r === "u" ? " · You" : " · Prakruthi")));
+      box.appendChild(el("div", "pk-msg " + (h[i].r === "u" ? "pk-u" : "pk-a"), h[i].t));
+    }
+  }
+  function renderContextView(box) {
+    box.innerHTML = "";
+    var hint = el("div", "note",
+      "Saved folders are added automatically to every message you send — no need to repeat your purpose. Keep wording clean and purpose-focused.");
+    box.appendChild(hint);
+    var slots = loadCtx();
+    for (var i = 0; i < slots.length; i++) (function (i) {
+      var card = el("div", "pk-slot");
+      card.appendChild(el("div", "nm", "Folder " + (i + 1)));
+      var name = document.createElement("input"); name.type = "text";
+      name.placeholder = "Name (e.g. Security research)";
+      name.value = slots[i].name || "";
+      var ta = document.createElement("textarea");
+      ta.placeholder = "Describe your ongoing purpose / rules for the AI...";
+      ta.value = slots[i].content || "";
+      var ops = el("div", "ops");
+      var chk = document.createElement("input"); chk.type = "checkbox"; chk.id = "pkOn" + i;
+      chk.checked = !!slots[i].on;
+      var lbl = el("label", null, "Always include"); lbl.htmlFor = chk.id;
+      var save = el("button", null, "Save");
+      save.onclick = function () {
+        var a = loadCtx();
+        a[i] = { name: name.value, content: ta.value, on: chk.checked };
+        saveCtx(a); toast("Folder " + (i + 1) + " saved ✓");
+      };
+      ops.appendChild(chk); ops.appendChild(lbl); ops.appendChild(save);
+      card.appendChild(name); card.appendChild(ta); card.appendChild(ops);
+      box.appendChild(card);
+    })(i);
+  }
+
+  /* ---------- build UI ---------- */
+  function buildUI() {
+    var toastEl = el("div"); toastEl.id = "pkToast"; document.body.appendChild(toastEl);
+
+    var btn = el("button"); btn.id = "pkMenuBtn"; btn.textContent = "☰ Menu ▾";
+    var menu = el("div"); menu.id = "pkMenu";
+
+    /* font section */
+    var s1 = el("div", "sec"); s1.appendChild(el("h5", null, "Font size"));
+    var r1 = el("div", "row");
+    var bDec = el("button", null, "A−"), bRes = el("button", null, "Reset"), bInc = el("button", null, "A+");
+    bDec.onclick = function () { state.zoom = Math.max(0.8, Math.round((state.zoom - 0.1) * 10) / 10); applyZoom(); };
+    bInc.onclick = function () { state.zoom = Math.min(1.5, Math.round((state.zoom + 0.1) * 10) / 10); applyZoom(); };
+    bRes.onclick = function () { state.zoom = 1; applyZoom(); };
+    r1.appendChild(bDec); r1.appendChild(bRes); r1.appendChild(bInc); s1.appendChild(r1);
+
+    /* language section */
+    var s2 = el("div", "sec"); s2.appendChild(el("h5", null, "Language"));
+    var r2 = el("div", "row");
+    r2.appendChild(el("span", null, "Chat interface"));
+    var sel = el("select"); sel.id = "pkLangSel";
+    [["si", "සිංහල"], ["en", "English"], ["ta", "தமிழ்"]].forEach(function (o) {
+      var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; sel.appendChild(op);
+    });
     sel.value = state.lang;
     sel.onchange = function () { state.lang = sel.value; localStorage.setItem(LS.lang, sel.value); applyLang(); };
-    document.getElementById("pkClear").onclick = function () {
-      var t = I18N[state.lang] || I18N.si;
-      if (confirm(t.clearAsk)) { localStorage.removeItem(LS.hist); var b = document.getElementById("pkHist"); if (b) b.remove(); }
-    };
+    r2.appendChild(sel); s2.appendChild(r2);
+
+    /* history section */
+    var s3 = el("div", "sec"); s3.appendChild(el("h5", null, "History"));
+    var r3 = el("div", "row");
+    var span3 = el("span", null, "Stored on this device only");
+    var bHist = el("button", null, "Open");
+    r3.appendChild(span3); r3.appendChild(bHist); s3.appendChild(r3);
+
+    /* context folders section */
+    var s4 = el("div", "sec"); s4.appendChild(el("h5", null, "Context folders"));
+    var r4 = el("div", "row");
+    var span4 = el("span", null, "3 slots · auto-sent");
+    var bCtx = el("button", null, "Manage");
+    r4.appendChild(span4); r4.appendChild(bCtx); s4.appendChild(r4);
+
+    /* accounts section (v1.2) */
+    var s5 = el("div", "sec");
+    var r5 = el("div", "row");
+    r5.appendChild(el("span", null, "Accounts"));
+    var bAcc = el("button", null, "v1.2 — soon"); bAcc.disabled = true;
+    r5.appendChild(bAcc); s5.appendChild(r5);
+
+    menu.appendChild(s1); menu.appendChild(s2); menu.appendChild(s3); menu.appendChild(s4); menu.appendChild(s5);
+    document.body.appendChild(btn); document.body.appendChild(menu);
+
+    btn.onclick = function (e) { e.stopPropagation(); menu.classList.toggle("open"); };
+    document.addEventListener("click", function (e) {
+      if (!menu.contains(e.target) && e.target !== btn) menu.classList.remove("open");
+    });
+
+    /* drawer + scrim */
+    var scrim = el("div"); scrim.id = "pkScrim";
+    var drawer = el("div"); drawer.id = "pkDrawer";
+    var hd = el("div", "hd");
+    var title = el("b", null, "History");
+    var close = el("button", null, "✕");
+    hd.appendChild(title); hd.appendChild(close);
+    var bd = el("div", "bd");
+    var vHist = el("div"), vCtx = el("div"); vCtx.style.display = "none";
+    bd.appendChild(vHist); bd.appendChild(vCtx);
+    drawer.appendChild(hd); drawer.appendChild(bd);
+    document.body.appendChild(scrim); document.body.appendChild(drawer);
+
+    function openDrawer(which) {
+      title.textContent = which === "ctx" ? "Context folders" : "History";
+      vHist.style.display = which === "ctx" ? "none" : "block";
+      vCtx.style.display = which === "ctx" ? "block" : "none";
+      if (which === "ctx") renderContextView(vCtx); else renderHistoryView(vHist);
+      scrim.classList.add("open"); drawer.classList.add("open");
+      menu.classList.remove("open");
+    }
+    function closeDrawer() { scrim.classList.remove("open"); drawer.classList.remove("open"); }
+
+    bHist.onclick = function () { openDrawer("hist"); };
+    bCtx.onclick = function () { openDrawer("ctx"); };
+    close.onclick = closeDrawer;
+    scrim.onclick = closeDrawer;
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") { closeDrawer(); menu.classList.remove("open"); } });
   }
 
   function init() {
-    buildPanel();
+    buildUI();
     applyLang();
     if (state.zoom !== 1) applyZoom();
-    renderHist();
-    document.getElementById("pkDark").textContent = state.dark ? "☀️" : "🌙";
-    if (state.dark) setTimeout(enableDark, 350);
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
