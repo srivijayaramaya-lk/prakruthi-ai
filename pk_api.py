@@ -1,5 +1,5 @@
 # pk_api.py — ප්‍රකෘති AI v1.2: Turso DB + Accounts + Gemini Vision + Health
-# fix: Turso cells එන්නේ {"type":..,"value":..} objects විදිහට — _cell() එකෙන් unwrap කරනවා
+# v1.2.3: vision — model fallback + real error reporting
 import os, re, time, hmac, hashlib, secrets
 import requests as rq
 from fastapi import APIRouter, Request
@@ -21,7 +21,6 @@ def _args(vals):
     return out
 
 def _cell(c):
-    """Turso v2 එකේ cell = {"type":"integer","value":"1"} — plain Python value එකක් කරනවා"""
     if isinstance(c, dict):
         v = c.get("value")
         if v is None:
@@ -72,7 +71,7 @@ try:
 except Exception as e:
     print("[pk] Turso init failed:", e)
 
-# ---------- passwords (stdlib — extra package ඕනෑ නෑ) ----------
+# ---------- passwords ----------
 def hash_pw(pw, salt=None):
     salt = salt or secrets.token_hex(16)
     dk = hashlib.pbkdf2_hmac("sha256", pw.encode(), salt.encode(), 60000)
@@ -97,7 +96,7 @@ def current_user(req):
 def j(data, code=200):
     return JSONResponse(data, status_code=code)
 
-# ---------- health (wake-up ping) ----------
+# ---------- health ----------
 @pk_router.get("/api/pk_health")
 def health():
     return {"ok": True, "db": bool(TURSO_URL and TURSO_KEY)}
@@ -179,7 +178,11 @@ async def hist_del(req: Request):
         db_exec("DELETE FROM history WHERE user_id=?", [int(u["id"])])
     return j({"ok": True})
 
-# ---------- Gemini Vision (📷) ----------
+# ---------- Gemini Vision (📷) — model fallback + real errors ----------
+VISION_PROMPT = ("You are ප්‍රකෘති AI, a warm helpful Sinhala assistant. The user sent a photo. "
+                 "Look carefully and answer in natural Sinhala (technical terms may stay English). "
+                 "Friendly, safe, concise.")
+
 @pk_router.post("/api/vision")
 async def vision(req: Request):
     b = await req.json()
@@ -191,27 +194,42 @@ async def vision(req: Request):
     if not GEMINI_KEY:
         return j({"error": "GEMINI_API_KEY Render env එකේ නෑ"}, 500)
     body = {"contents": [{"role": "user", "parts": [
-        {"text": "You are ප්‍රකෘති AI, a warm helpful Sinhala assistant. The user sent a photo. Look carefully and answer in natural Sinhala (technical terms may stay English). Friendly, safe, concise."},
-        {"text": msg},
+        {"text": VISION_PROMPT}, {"text": msg},
         {"inline_data": {"mime_type": m.group(1), "data": m.group(2)}}]}]}
-    try:
-        r = rq.post("https://generativelanguage.googleapis.com/v1beta/models/" + V_MODEL +
-                    ":generateContent?key=" + GEMINI_KEY, json=body, timeout=60)
-        d = r.json()
-        parts = d["candidates"][0]["content"]["parts"]
-        reply = "".join(p.get("text", "") for p in parts).strip()
-    except Exception:
-        reply = ""
-    if not reply:
-        return j({"error": "Vision reply එකක් ලැබුණේ නෑ"}, 502)
-    t, u = current_user(req)
-    if u:
-        ts = int(time.time() * 1000)
-        db_exec("INSERT INTO history(user_id,role,text,ts) VALUES(?,?,?,?)", [int(u["id"]), "u", msg, ts])
-        db_exec("INSERT INTO history(user_id,role,text,ts) VALUES(?,?,?,?)", [int(u["id"]), "a", reply[:2000], ts])
-    return j({"ok": True, "reply": reply})
+    tried, last_err = [], ""
+    for model in [V_MODEL, "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-8b"]:
+        if model in tried:
+            continue
+        tried.append(model)
+        try:
+            r = rq.post("https://generativelanguage.googleapis.com/v1beta/models/" + model +
+                        ":generateContent?key=" + GEMINI_KEY, json=body, timeout=60)
+            d = r.json()
+            if r.status_code != 200:
+                last_err = model + " HTTP" + str(r.status_code) + ": " + \
+                    str((d.get("error") or {}).get("message") or d)[:140]
+                print("[pk] vision", last_err)
+                continue
+            cand = (d.get("candidates") or [{}])[0]
+            parts = (cand.get("content") or {}).get("parts") or []
+            reply = "".join(p.get("text", "") for p in parts).strip()
+            if reply:
+                t, u = current_user(req)
+                if u:
+                    ts = int(time.time() * 1000)
+                    db_exec("INSERT INTO history(user_id,role,text,ts) VALUES(?,?,?,?)",
+                            [int(u["id"]), "u", msg, ts])
+                    db_exec("INSERT INTO history(user_id,role,text,ts) VALUES(?,?,?,?)",
+                            [int(u["id"]), "a", reply[:2000], ts])
+                return j({"ok": True, "reply": reply, "model": model})
+            last_err = model + " empty (finish=" + str(cand.get("finishReason")) + ")"
+            print("[pk] vision", last_err)
+        except Exception as e:
+            last_err = model + " " + str(e)[:120]
+            print("[pk] vision", last_err)
+    return j({"error": "Vision fail — " + last_err}, 502)
 
-# ---------- pk_v12.js serve කරන route එක ----------
+# ---------- pk_v12.js serve ----------
 @pk_router.get("/pk_v12.js")
 def pk_v12_js():
     return FileResponse(os.path.join(os.path.dirname(__file__), "pk_v12.js"),
