@@ -204,32 +204,40 @@ CHAT_HTML = """<!DOCTYPE html>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI','Nirmala UI','Noto Color Emoji',sans-serif;
-         background: linear-gradient(135deg,#e8f5e9,#f1f8e9);
-         min-height: 100vh; display: flex; justify-content: center; }
-  .app { width: 100%; max-width: 640px; min-height: 100vh; background: #fff;
-         display: flex; flex-direction: column; box-shadow: 0 0 24px rgba(0,0,0,.08); }
-  header { padding: 14px 18px; background: #1b5e20; color: #fff; }
-  header h1 { font-size: 18px; display: flex; justify-content: space-between; }
-  header .sub { font-size: 12px; opacity: .85; margin-top: 3px; }
-  .badge { display: inline-block; background: rgba(255,255,255,.15);
-           padding: 2px 8px; border-radius: 10px; font-size: 11px; margin-right: 6px; }
-  #chat { flex: 1; overflow-y: auto; padding: 16px; display: flex;
-          flex-direction: column; gap: 10px; }
-  .msg { max-width: 85%; padding: 10px 14px; border-radius: 14px;
-         line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
-  .user { align-self: flex-end; background: #c8e6c9; border-bottom-right-radius: 4px; }
-  .ai { align-self: flex-start; background: #f1f3f4; border-bottom-left-radius: 4px; }
-  .gate { align-self: flex-start; font-size: 11px; color: #777; margin-top: -7px; }
-  .gate b { color: #1b5e20; }
-  .note { align-self: flex-start; font-size: 12px; color: #1b5e20;
-          background: #f1f8e9; border: 1px dashed #a5d6a7; border-radius: 10px;
-          padding: 6px 10px; max-width: 85%; }
-  footer { padding: 10px; background: #fafafa; border-top: 1px solid #eee;
-           display: flex; flex-direction: column; gap: 6px; }
-  .inputrow { display: flex; gap: 8px; }
-  .waiting { font-size: 12px; color: #1b5e20; padding: 2px 4px; display: none;
-             align-items: center; gap: 6px; }
+html, body { height: 100%; }
+body { font-family: 'Segoe UI','Nirmala UI','Noto Color Emoji',sans-serif;
+       background: linear-gradient(135deg,#e8f5e9,#f1f8e9);
+       height: 100vh;            /* fallback */
+       height: 100dvh;           /* mobile browser address bar එකට */
+       overflow: hidden;         /* page එකම scroll වෙන එක නවත්තනවා */
+       display: flex; justify-content: center; }
+.app { width: 100%; max-width: 640px;
+       height: 100vh;            /* fallback */
+       height: 100dvh;           /* min-height නෙවෙයි — fixed height */
+       background: #fff; display: flex; flex-direction: column;
+       box-shadow: 0 0 24px rgba(0,0,0,.08); overflow: hidden; }
+header { flex: 0 0 auto; padding: 14px 18px; background: #1b5e20; color: #fff; }
+header h1 { font-size: 18px; display: flex; justify-content: space-between; }
+header .sub { font-size: 12px; opacity: .85; margin-top: 3px; }
+.badge { display: inline-block; background: rgba(255,255,255,.15);
+         padding: 2px 8px; border-radius: 10px; font-size: 11px; margin-right: 6px; }
+#chat { flex: 1 1 0;             /* ඉතුරු ඉඩ ගන්න */
+        min-height: 0;           /* ⭐ මේක අනිවාර්යයි — නැත්තං shrink වෙන්නෙ නෑ */
+        overflow-y: auto; padding: 16px; display: flex;
+        flex-direction: column; gap: 10px; }
+.msg { max-width: 85%; padding: 10px 14px; border-radius: 14px;
+       line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+.user { align-self: flex-end; background: #c8e6c9; border-bottom-right-radius: 4px; }
+.ai { align-self: flex-start; background: #f1f3f4; border-bottom-left-radius: 4px; }
+.gate { align-self: flex-start; font-size: 11px; color: #777; margin-top: -7px; }
+.gate b { color: #1b5e20; }
+.note { align-self: flex-start; font-size: 12px; color: #1b5e20;
+        background: #f1f8e9; border: 1px dashed #a5d6a7; border-radius: 10px;
+        padding: 6px 10px; max-width: 85%; }
+footer { flex: 0 0 auto;        /* footer එක හැකිලෙන්නෙ නෑ */
+          padding: 10px; background: #fafafa; border-top: 1px solid #eee;
+          display: flex; flex-direction: column; gap: 6px; }
+/* අනිත් CSS rules (inputrow, waiting, lotus-load, input, button...) වෙනස් කරන්න දෙයක් නෑ */
   .lotus-load { font-size: 20px; display: inline-block;
                 animation: lotusPulse 1.5s infinite ease-in-out; }
   @keyframes lotusPulse {
