@@ -88,7 +88,7 @@
 
   /* ---------- 📷 camera ---------- */
   function chatInput() {
-    var list = document.querySelectorAll("textarea, input[type='text']");
+    var list = document.querySelectorAll("textarea, input[type='text'], input:not([type])");
     for (var j = 0; j < list.length; j++) {
       var it = list[j];
       if (it.closest && it.closest("#pkDrawer,#pkMenu,#pkAccCard,#pkWake")) continue;
