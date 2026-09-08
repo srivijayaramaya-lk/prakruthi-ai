@@ -9,6 +9,7 @@ try:
 except Exception:
     pass
 
+from pk_api import pk_router
 from collections import OrderedDict
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
@@ -356,6 +357,7 @@ input.addEventListener("keydown", e => { if (e.key === "Enter") send(); });
 input.focus();
 </script>
 <script src="/pk_features.js"></script>
+<script src="/pk_v12.js"></script>
 </body>
 </html>"""
 
@@ -365,6 +367,8 @@ from fastapi.responses import FileResponse
 @app.get("/pk_features.js")
 def pk_features_js():
     return FileResponse("pk_features.js", media_type="application/javascript")
+
+app.include_router(pk_router)
 
 if __name__ == "__main__":
     import socket, uvicorn
