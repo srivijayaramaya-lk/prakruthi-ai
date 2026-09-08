@@ -1,6 +1,5 @@
-/* ප්‍රකෘති AI — UI Pack v1.6.2 (Liquid Glass + Independent History Hooks)
-   History hooks attach FIRST (never blocked by glass code). Toast confirmations
-   show capture is working: "Message saved ✓" / "Reply saved ✓". Clear button added.
+/* ප්‍රකෘති AI — UI Pack v1.6.3 (Liquid Glass + Independent History Hooks)
+   v1.6.3: login modal (#pkAccModal) + our UI text no longer leak into history.
    ☰ menu · 🔤 font · 🌏 language · 💾 history drawer · 📌 context folders. All data local. */
 (function () {
   "use strict";
@@ -159,15 +158,22 @@
     }
     aiWait = false; aiBuf = ""; aiSent = "";
   }
+  function uiText(node) {
+    return node && node.parentElement && node.parentElement.closest &&
+           node.parentElement.closest("#pkToast,#pkMenu,#pkDrawer,#pkScrim,#pkGlassBg,#pkAccModal");
+  }
   function collectMutation(mut) {
     var out = "", i, n;
     for (i = 0; i < mut.addedNodes.length; i++) {
       n = mut.addedNodes[i];
-      if (n.nodeType === 3) out += " " + (n.nodeValue || "");
-      else if (n.nodeType === 1 && !ours(n) && !(n.closest && n.closest("#pkMenu,#pkDrawer,#pkToast,#pkGlassBg,#pkScrim")))
+      if (n.nodeType === 3) {
+        if (uiText(n)) continue;
+        out += " " + (n.nodeValue || "");
+      }
+      else if (n.nodeType === 1 && !ours(n) && !(n.closest && n.closest("#pkMenu,#pkDrawer,#pkToast,#pkGlassBg,#pkScrim,#pkAccModal")))
         out += " " + (n.textContent || "");
     }
-    if (mut.type === "characterData" && mut.target && mut.target.nodeValue)
+    if (mut.type === "characterData" && mut.target && mut.target.nodeValue && !uiText(mut.target))
       out += " " + mut.target.nodeValue;
     return out;
   }
@@ -176,7 +182,7 @@
   function chatInput() {
     var list = document.querySelectorAll("textarea, input[type='text']");
     for (var j = 0; j < list.length; j++) {
-      if (list[j].closest && list[j].closest("#pkDrawer,#pkMenu")) continue;
+      if (list[j].closest && list[j].closest("#pkDrawer,#pkMenu,#pkAccModal")) continue;
       return list[j];
     }
     return null;
@@ -190,7 +196,6 @@
   function hookSend() {
     if (hooksDone) return;
     hooksDone = true;
-    /* 1) Enter in the chat input (any input created at any time) */
     document.addEventListener("keydown", function (e) {
       try {
         if (e.key !== "Enter" || e.shiftKey) return;
@@ -198,27 +203,25 @@
         if (!t || t.nodeType !== 1) return;
         var isText = t.tagName === "TEXTAREA" || (t.tagName === "INPUT" && (t.type === "text" || !t.type));
         if (!isText) return;
-        if (t.closest && t.closest("#pkDrawer,#pkMenu")) return;
+        if (t.closest && t.closest("#pkDrawer,#pkMenu,#pkAccModal")) return;
         onSendAttempt(t);
       } catch (err) {}
     }, true);
-    /* 2) Send button click (button / submit / role=button) */
     document.addEventListener("click", function (e) {
       try {
         var b = e.target && e.target.closest ? e.target.closest("button, input[type='submit'], [role='button']") : null;
-        if (!b || b.id === "pkMenuBtn" || (b.closest && b.closest("#pkMenu,#pkDrawer,#pkToast"))) return;
+        if (!b || b.id === "pkMenuBtn" || (b.closest && b.closest("#pkMenu,#pkDrawer,#pkToast,#pkAccModal"))) return;
         var lbl = (b.textContent || b.value || b.getAttribute && b.getAttribute("aria-label") || "");
         if (/යවන්න|send|அனுப்பு/i.test(lbl)) onSendAttempt(null);
       } catch (err) {}
     }, true);
-    /* 3) Form submit (backup) */
     document.addEventListener("submit", function (e) {
       try {
         var f = e.target;
         if (!f || !f.querySelectorAll) return;
         var list = f.querySelectorAll("textarea, input[type='text']");
         for (var j = 0; j < list.length; j++) {
-          if (list[j].closest && list[j].closest("#pkDrawer,#pkMenu")) continue;
+          if (list[j].closest && list[j].closest("#pkDrawer,#pkMenu,#pkAccModal")) continue;
           var v = (list[j].value || "").trim();
           if (v) { addHist("u", v); aiCaptureStart(v); toast("Message saved ✓"); }
           break;
@@ -480,7 +483,7 @@
     var s5 = el("div", "sec");
     var r5 = el("div", "row");
     r5.appendChild(el("span", null, "Accounts"));
-    var bAcc = el("button", null, "v1.2 — soon"); bAcc.disabled = true;
+    var bAcc = el("button", null, "See Account ☁ below"); bAcc.disabled = true;
     r5.appendChild(bAcc); s5.appendChild(r5);
 
     menu.appendChild(s1); menu.appendChild(s2); menu.appendChild(s3); menu.appendChild(s4); menu.appendChild(s5);
@@ -535,7 +538,7 @@
   function init() {
     buildGlassBg();
     buildUI();
-    hookSend();          /* FIRST & independent — history never blocked by glass */
+    hookSend();
     applyLang();
     if (state.zoom !== 1) applyZoom();
     requestAnimationFrame(function () {
