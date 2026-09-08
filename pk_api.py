@@ -1,5 +1,5 @@
 # pk_api.py — ප්‍රකෘති AI v1.2: Turso DB + Accounts + Gemini Vision + Health
-# chat_server.py එකට යෙදෙන්නේ පේළි 2ක් විතරයි (පියවර 5 බලන්න)
+# fix: Turso cells එන්නේ {"type":..,"value":..} objects විදිහට — _cell() එකෙන් unwrap කරනවා
 import os, re, time, hmac, hashlib, secrets
 import requests as rq
 from fastapi import APIRouter, Request
@@ -20,23 +20,45 @@ def _args(vals):
                    else {"type": "text", "value": str(v)})
     return out
 
+def _cell(c):
+    """Turso v2 එකේ cell = {"type":"integer","value":"1"} — plain Python value එකක් කරනවා"""
+    if isinstance(c, dict):
+        v = c.get("value")
+        if v is None:
+            return None
+        t = c.get("type")
+        if t == "integer":
+            try: return int(v)
+            except Exception: return v
+        if t == "real":
+            try: return float(v)
+            except Exception: return v
+        return v
+    return c
+
 def db_exec(sql, vals=None, rows=False):
     if not (TURSO_URL and TURSO_KEY):
         raise RuntimeError("TURSO_URL / TURSO_KEY Render env එකේ නෑ")
     body = {"requests": [
         {"type": "execute", "stmt": {"sql": sql, "args": _args(vals or [])}},
         {"type": "close"}]}
-    r = rq.post(TURSO_URL + "/v2/pipeline", json=body,
-                headers={"Authorization": "Bearer " + TURSO_KEY}, timeout=15)
-    r.raise_for_status()
-    res = r.json()["results"][0]
+    try:
+        r = rq.post(TURSO_URL + "/v2/pipeline", json=body,
+                    headers={"Authorization": "Bearer " + TURSO_KEY}, timeout=15)
+        r.raise_for_status()
+        res = r.json()["results"][0]
+    except Exception as e:
+        print("[pk] db_exec:", sql[:60], "->", e)
+        raise
     if res.get("type") == "error":
+        print("[pk] sql error:", res.get("error"))
         raise RuntimeError(str(res.get("error")))
     if not rows:
         return []
     result = (res.get("response") or {}).get("result") or {}
     cols = [c["name"] for c in result.get("cols", [])]
-    return [{cols[i]: row[i] for i in range(len(cols))} for row in result.get("rows", [])]
+    return [{cols[i]: _cell(row[i]) for i in range(min(len(cols), len(row)))}
+            for row in result.get("rows", [])]
 
 SCHEMA = [
     "CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, pass TEXT NOT NULL, created INTEGER NOT NULL)",
@@ -83,31 +105,42 @@ def health():
 # ---------- accounts ----------
 @pk_router.post("/api/register")
 async def register(req: Request):
-    b = await req.json()
-    name = str(b.get("username") or "").strip()
-    pw = str(b.get("password") or "")
-    if not re.fullmatch(r"[A-Za-z0-9_]{3,20}", name):
-        return j({"error": "Username: අකුරු 3-20 (a-z, 0-9, _)"}, 400)
-    if len(pw) < 6:
-        return j({"error": "Password අකුරු 6කට වැඩි වෙන්න"}, 400)
-    if db_exec("SELECT id FROM users WHERE username=?", [name], rows=True):
-        return j({"error": "මේ username දැනටමත් තියෙනවා"}, 409)
-    db_exec("INSERT INTO users(username,pass,created) VALUES(?,?,?)", [name, hash_pw(pw), int(time.time() * 1000)])
-    uid = int(db_exec("SELECT id FROM users WHERE username=?", [name], rows=True)[0]["id"])
-    tok = secrets.token_hex(24)
-    db_exec("INSERT INTO sessions(token,user_id,created) VALUES(?,?,?)", [tok, uid, int(time.time() * 1000)])
-    return j({"ok": True, "token": tok, "username": name})
+    try:
+        b = await req.json()
+        name = str(b.get("username") or "").strip()
+        pw = str(b.get("password") or "")
+        if not re.fullmatch(r"[A-Za-z0-9_]{3,20}", name):
+            return j({"error": "Username: අකුරු 3-20 (a-z, 0-9, _)"}, 400)
+        if len(pw) < 6:
+            return j({"error": "Password අකුරු 6කට වැඩි වෙන්න"}, 400)
+        if db_exec("SELECT id FROM users WHERE username=?", [name], rows=True):
+            return j({"error": "මේ username දැනටමත් තියෙනවා"}, 409)
+        db_exec("INSERT INTO users(username,pass,created) VALUES(?,?,?)",
+                [name, hash_pw(pw), int(time.time() * 1000)])
+        uid = int(db_exec("SELECT id FROM users WHERE username=?", [name], rows=True)[0]["id"])
+        tok = secrets.token_hex(24)
+        db_exec("INSERT INTO sessions(token,user_id,created) VALUES(?,?,?)",
+                [tok, uid, int(time.time() * 1000)])
+        return j({"ok": True, "token": tok, "username": name})
+    except Exception as e:
+        print("[pk] register error:", e)
+        return j({"error": "server error — නැවත උත්සාහ කරන්න"}, 500)
 
 @pk_router.post("/api/login")
 async def login(req: Request):
-    b = await req.json()
-    name = str(b.get("username") or "").strip()
-    rows = db_exec("SELECT * FROM users WHERE username=?", [name], rows=True)
-    if not rows or not check_pw(str(b.get("password") or ""), str(rows[0]["pass"])):
-        return j({"error": "Username හෝ password වැරදියි"}, 401)
-    tok = secrets.token_hex(24)
-    db_exec("INSERT INTO sessions(token,user_id,created) VALUES(?,?,?)", [tok, int(rows[0]["id"]), int(time.time() * 1000)])
-    return j({"ok": True, "token": tok, "username": name})
+    try:
+        b = await req.json()
+        name = str(b.get("username") or "").strip()
+        rows = db_exec("SELECT * FROM users WHERE username=?", [name], rows=True)
+        if not rows or not check_pw(str(b.get("password") or ""), str(rows[0]["pass"])):
+            return j({"error": "Username හෝ password වැරදියි"}, 401)
+        tok = secrets.token_hex(24)
+        db_exec("INSERT INTO sessions(token,user_id,created) VALUES(?,?,?)",
+                [tok, int(rows[0]["id"]), int(time.time() * 1000)])
+        return j({"ok": True, "token": tok, "username": name})
+    except Exception as e:
+        print("[pk] login error:", e)
+        return j({"error": "server error — නැවත උත්සාහ කරන්න"}, 500)
 
 @pk_router.post("/api/logout")
 async def logout(req: Request):
