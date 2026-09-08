@@ -1,4 +1,5 @@
-/* ප්‍රකෘති AI v1.2 client — 📷 vision + 👤 accounts + ☁ sync + 🪷 wake screen */
+/* ප්‍රකෘති AI v1.2 client — 📷 vision + 👤 accounts + ☁ sync + 🪷 wake screen
+   v1.2.1: menu match — "See Account ☁ below" text එකත් හම්බවෙනවා */
 (function () {
   "use strict";
   if (window.__pkV12) return;
@@ -84,8 +85,8 @@
       setTimeout(function () { wakeCheck(tries - 1); }, 4000);
     }
   }
-  setTimeout(function () { wakeCheck(22); }, 1500); /* 1.5s න් reply නැත්තං screen එක */
-  setInterval(function () { /* app open තියෙනකල් server එක අවදියෙන් */
+  setTimeout(function () { wakeCheck(22); }, 1500);
+  setInterval(function () {
     if (document.visibilityState === "visible") fetch("/api/pk_health", { cache: "no-store" }).catch(function () {});
   }, 9 * 60 * 1000);
 
@@ -167,7 +168,7 @@
     host.appendChild(btn); host.appendChild(file); host.appendChild(chip);
   }
 
-  /* ---------- 📷 send takeover (image එකක් තියෙනවා නම් vision එකට) ---------- */
+  /* ---------- 📷 send takeover ---------- */
   function sendVision(text) {
     var inp = chatInput();
     var box = chatBox(inp);
@@ -270,7 +271,7 @@
     if (!menu) { setTimeout(upgradeMenu, 800); return; }
     var btns = menu.querySelectorAll("button");
     for (var i = 0; i < btns.length; i++) {
-      if (/v1\.2|soon/i.test(btns[i].textContent || "")) {
+      if (/v1\.2|soon|below/i.test(btns[i].textContent || "")) {
         var sec = btns[i].closest(".sec");
         if (sec) {
           sec.innerHTML = "<h5>Account ☁</h5>";
@@ -282,7 +283,7 @@
     setTimeout(upgradeMenu, 900);
   }
 
-  /* ---------- ☁ cloud sync (local history → cloud) ---------- */
+  /* ---------- ☁ cloud sync ---------- */
   var _si = Storage.prototype.setItem, _ri = Storage.prototype.removeItem;
   Storage.prototype.setItem = function (k, v) {
     _si.call(this, k, v);
