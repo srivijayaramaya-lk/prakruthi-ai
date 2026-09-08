@@ -214,7 +214,7 @@ CHAT_HTML = """<!DOCTYPE html>
   header .sub { font-size: 12px; opacity: .85; margin-top: 3px; }
   .badge { display: inline-block; background: rgba(255,255,255,.15);
            padding: 2px 8px; border-radius: 10px; font-size: 11px; margin-right: 6px; }
-  #chat { flex: 1; overflow-y: auto; padding: 16px; display: flex;
+  #chat { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; display: flex;
           flex-direction: column; gap: 10px; }
   .msg { max-width: 85%; padding: 10px 14px; border-radius: 14px;
          line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
