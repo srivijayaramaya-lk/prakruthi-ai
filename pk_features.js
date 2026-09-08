@@ -1,5 +1,6 @@
-/* ප්‍රකෘති AI — UI Pack v1.5 (Liquid Glass — iOS 26 style)
-   Panel = clear glass: background shows through. Inner opaque layers cleared.
+/* ප්‍රකෘති AI — UI Pack v1.6 (Liquid Glass + Live History Capture)
+   Glass: iOS-26 style clear panels. History: captures directly from the chat UI
+   (input on Send/Enter + AI reply via DOM watcher) — no dependence on request format.
    ☰ menu · 🔤 font · 🌏 language · 💾 history drawer · 📌 context folders. All data local. */
 (function () {
   "use strict";
@@ -129,8 +130,7 @@
     }
   }
 
-  /* ---------- LIQUID GLASS core ---------- */
-  /* inner opaque layers → clear; bubbles (rounded, small) stay readable */
+  /* ---------- LIQUID GLASS ---------- */
   function clearLayers(panel) {
     var kids = panel.querySelectorAll("*");
     for (var i = 0; i < kids.length; i++) {
@@ -143,19 +143,17 @@
       var a = p.length > 3 ? parseFloat(p[3]) : 1;
       if (a < 0.35) continue;
       var w = k.offsetWidth || 0, h = k.offsetHeight || 0;
-      if (w < 60 && h < 24) continue;                    /* tiny bits — keep */
+      if (w < 60 && h < 24) continue;
       var rad = parseFloat(cs.borderTopLeftRadius) || 0;
-      if (rad >= 8 && w < 480) continue;                 /* bubble-ish — keep own bg */
+      if (rad >= 8 && w < 480) continue;
       var r = +p[0], g = +p[1], b = +p[2], L = lum(r, g, b);
       k.dataset.pkGlass = "child";
       if (L < 110) {
-        /* dark layer (header) → dark glass; white text stays readable */
         k.style.setProperty("backdrop-filter", "blur(14px) saturate(1.3)", "important");
         k.style.setProperty("-webkit-backdrop-filter", "blur(14px) saturate(1.3)", "important");
         k.style.setProperty("background-color", "rgba(" + r + "," + g + "," + b + ",0.5)", "important");
         k.style.setProperty("border-color", "rgba(255,255,255,.35)", "important");
       } else {
-        /* light layer → nearly clear so the spheres show through */
         k.style.setProperty("background-image", "none", "important");
         k.style.setProperty("background-color", "rgba(255,255,255,0.10)", "important");
       }
@@ -184,7 +182,6 @@
     }
     return best;
   }
-  /* other (outside-panel) light/dark surfaces → subtle glass */
   function glassify(elx) {
     if (elx.dataset && elx.dataset.pkGlass) return;
     if (elx === document.body || elx === document.documentElement) return;
@@ -213,20 +210,100 @@
       else clearLayers(panel);
     } else liftContent();
     var all = document.body.querySelectorAll("*");
-    var panelEl = panel;
     for (var i = 0; i < all.length; i++) {
       var k = all[i];
-      if (panelEl && panelEl.contains(k)) continue;
+      if (panel && panel.contains(k)) continue;
       glassify(k);
     }
+    hookSend();
   }
 
   /* ---------- history store ---------- */
   function loadHist() { try { return JSON.parse(localStorage.getItem(LS.hist) || "[]"); } catch (e) { return []; } }
   function addHist(role, text) {
     if (!text || typeof text !== "string") return;
-    var h = loadHist(); h.push({ r: role, t: text.slice(0, 2000), ts: Date.now() });
+    text = text.trim(); if (!text) return;
+    var h = loadHist();
+    var last = h[h.length - 1];
+    if (last && last.r === role && last.t === text.slice(0, 2000) && Date.now() - last.ts < 8000) return;
+    h.push({ r: role, t: text.slice(0, 2000), ts: Date.now() });
     try { localStorage.setItem(LS.hist, JSON.stringify(h.slice(-60))); } catch (e) {}
+  }
+
+  /* ---------- LIVE capture: user sends + AI reply ---------- */
+  var aiWait = false, aiBuf = "", aiStarted = 0, aiTimer = null, aiSent = "";
+
+  function aiChunkOk(s) {
+    if (!s) return false;
+    var t = s.trim();
+    if (!t) return false;
+    if (t === aiSent || (aiSent && t.indexOf(aiSent) !== -1)) return false;   /* user bubble / re-render */
+    if (t.length < 8) return false;
+    if (/proc|SILA|lotus|clear|unreachable|Can't reach|can.t reach/i.test(t)) return false;
+    return true;
+  }
+  function aiCaptureStart(sent) {
+    aiWait = true; aiBuf = ""; aiStarted = Date.now(); aiSent = (sent || "").trim();
+    clearTimeout(aiTimer);
+    aiTimer = setTimeout(aiCaptureFinish, 30000); /* safety: 30s max wait */
+  }
+  function aiCaptureReset() {
+    clearTimeout(aiTimer);
+    aiTimer = setTimeout(aiCaptureFinish, 1500); /* quiet period = reply complete */
+    if (Date.now() - aiStarted > 180000) aiCaptureFinish();
+  }
+  function aiCaptureFinish() {
+    clearTimeout(aiTimer);
+    if (aiWait && aiBuf.trim().length >= 15) addHist("a", aiBuf);
+    aiWait = false; aiBuf = ""; aiSent = "";
+  }
+  function collectMutation(mut) {
+    var out = "";
+    var i, n;
+    for (i = 0; i < mut.addedNodes.length; i++) {
+      n = mut.addedNodes[i];
+      if (n.nodeType === 3) out += " " + (n.nodeValue || "");
+      else if (n.nodeType === 1 && !ours(n) && !(n.closest && n.closest("#pkMenu,#pkDrawer,#pkToast,#pkGlassBg,#pkScrim")))
+        out += " " + (n.textContent || "");
+    }
+    if (mut.type === "characterData" && mut.target && mut.target.nodeValue)
+      out += " " + mut.target.nodeValue;
+    return out;
+  }
+
+  function hookSend() {
+    /* attach to the chat input (skip our own drawer fields) */
+    var inputs = document.querySelectorAll("textarea, input[type='text']");
+    var inp = null;
+    for (var i = 0; i < inputs.length; i++) {
+      if (inputs[i].closest && inputs[i].closest("#pkDrawer,#pkMenu")) continue;
+      inp = inputs[i]; break;
+    }
+    if (inp && !inp.dataset.pkSendHook) {
+      inp.dataset.pkSendHook = "1";
+      inp.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && !e.shiftKey) {
+          var v = (inp.value || "").trim();
+          if (v) { addHist("u", v); aiCaptureStart(v); }
+        }
+      });
+    }
+    if (document.dataset && document.dataset.pkClickHook) return;
+    document.dataset.pkClickHook = "1";
+    document.addEventListener("click", function (e) {
+      var b = e.target && e.target.closest ? e.target.closest("button") : null;
+      if (!b || b.id === "pkMenuBtn" || (b.closest && b.closest("#pkMenu,#pkDrawer"))) return;
+      if (/යවන්න|send|அனுப்பு|paper|➤|➢|↗/i.test(b.textContent || b.value || "") || /send/i.test(b.className || "")) {
+        var cur = null;
+        var list = document.querySelectorAll("textarea, input[type='text']");
+        for (var j = 0; j < list.length; j++) {
+          if (list[j].closest && list[j].closest("#pkDrawer,#pkMenu")) continue;
+          cur = list[j]; break;
+        }
+        var v = cur ? (cur.value || "").trim() : "";
+        if (v) { addHist("u", v); aiCaptureStart(v); }
+      }
+    }, true);
   }
 
   /* ---------- context folders ---------- */
@@ -247,41 +324,15 @@
     }
     return parts.join(" | ");
   }
-
-  /* ---------- network hooks: history + auto context ---------- */
-  var REQ_KEYS = ["message", "prompt", "text", "q", "content"];
-  var RESP_KEYS = ["reply", "response", "output", "text", "answer", "message"];
-  function pick(obj, keys) {
-    for (var i = 0; i < keys.length; i++)
-      if (obj && typeof obj[keys[i]] === "string" && obj[keys[i]]) return obj[keys[i]];
-    return "";
-  }
-  function pickDeep(obj, keys) {
-    var v = pick(obj, keys); if (v) return v;
-    var best = "";
-    try {
-      for (var k in obj) {
-        if (typeof obj[k] === "string" && obj[k].length > best.length) best = obj[k];
-        else if (obj[k] && typeof obj[k] === "object") {
-          var inner = pick(obj[k], keys);
-          if (inner && inner.length > best.length) best = inner;
-          else for (var k2 in obj[k])
-            if (typeof obj[k][k2] === "string" && obj[k][k2].length > best.length) best = obj[k][k2];
-        }
-      }
-    } catch (e) {}
-    return best;
-  }
   function prepareBody(bodyStr) {
     var obj; try { obj = JSON.parse(bodyStr); } catch (e) { return null; }
     if (!obj || typeof obj !== "object") return null;
-    for (var i = 0; i < REQ_KEYS.length; i++) {
-      var k = REQ_KEYS[i];
+    var keys = ["message", "prompt", "text", "q", "content"];
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
       if (typeof obj[k] === "string" && obj[k]) {
-        var orig = obj[k];
-        addHist("u", orig);
         var ctx = activeCtxText();
-        if (ctx) obj[k] = "[Context — applies to all my messages: " + ctx + "]\n" + orig;
+        if (ctx) obj[k] = "[Context — applies to all my messages: " + ctx + "]\n" + obj[k];
         return JSON.stringify(obj);
       }
     }
@@ -300,43 +351,21 @@
           if (nb) opts.body = nb;
         }
       } catch (e) {}
-      return _fetch.apply(this, args).then(function (res) {
-        try {
-          var u2 = typeof args[0] === "string" ? args[0] : (args[0] && args[0].url) || "";
-          var m2 = ((args[1] && args[1].method) || "GET").toUpperCase();
-          if (m2 === "POST" && /\/chat/.test(u2))
-            res.clone().json().then(function (d) { addHist("a", pickDeep(d, RESP_KEYS)); }).catch(function () {});
-        } catch (e) {}
-        return res;
-      });
+      return _fetch.apply(this, args);
     };
   }
-  (function () {
-    var _open = XMLHttpRequest.prototype.open, _send = XMLHttpRequest.prototype.send;
-    XMLHttpRequest.prototype.open = function (m, u) {
-      this.__pkChat = (m || "").toUpperCase() === "POST" && /\/chat/.test(u || "");
-      return _open.apply(this, arguments);
-    };
-    XMLHttpRequest.prototype.send = function (body) {
-      var xhr = this;
-      if (xhr.__pkChat && typeof body === "string") {
-        var nb = prepareBody(body); if (nb) body = nb;
-        xhr.addEventListener("load", function () {
-          try { addHist("a", pickDeep(JSON.parse(xhr.responseText), RESP_KEYS)); } catch (e) {}
-        });
-      }
-      return _send.apply(this, arguments);
-    };
-  })();
 
   /* ---------- chat page language ---------- */
   function applyLang() {
     var s = CHAT_STRINGS[state.lang] || CHAT_STRINGS.si;
-    var inp = document.querySelector("textarea, input[type='text'], input:not([type='hidden'])");
-    if (inp) inp.placeholder = s.placeholder;
+    var inputs = document.querySelectorAll("textarea, input[type='text']");
+    for (var i = 0; i < inputs.length; i++) {
+      if (inputs[i].closest && inputs[i].closest("#pkDrawer,#pkMenu")) continue;
+      inputs[i].placeholder = s.placeholder; break;
+    }
     var btns = document.querySelectorAll("button, input[type='submit']");
-    for (var i = 0; i < btns.length; i++) {
-      var b = btns[i];
+    for (var j = 0; j < btns.length; j++) {
+      var b = btns[j];
       if (b.id === "pkMenuBtn" || (b.closest && b.closest("#pkMenu,#pkDrawer"))) continue;
       if (/යවන්න|send|அனுப்பு/i.test((b.textContent || b.value || ""))) {
         if (b.tagName === "INPUT") b.value = s.send; else b.textContent = s.send;
@@ -476,9 +505,20 @@
       requestAnimationFrame(function () { scan(); });
     });
     var pending = null;
-    new MutationObserver(function () {
-      if (!pending) pending = requestAnimationFrame(function () { pending = null; scan(); });
-    }).observe(document.documentElement, { childList: true, subtree: true });
+    new MutationObserver(function (muts) {
+      if (aiWait) {
+        for (var i = 0; i < muts.length; i++) {
+          var chunk = collectMutation(muts[i]);
+          if (aiChunkOk(chunk)) {
+            aiBuf += " " + chunk.trim();
+            aiCaptureReset();
+          }
+        }
+      }
+      if (!pending) pending = requestAnimationFrame(function () {
+        pending = null; scan();
+      });
+    }).observe(document.body, { childList: true, subtree: true, characterData: true });
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
