@@ -1,6 +1,6 @@
-/* ප්‍රකෘති AI — UI Pack v1.6.1 (Liquid Glass + Fixed History Capture)
-   Fix: click/submit capture now attaches correctly (v1.6 crash bug removed).
-   History captures from the chat UI: input on Send/Enter/Submit + AI reply via DOM watcher.
+/* ප්‍රකෘති AI — UI Pack v1.6.2 (Liquid Glass + Independent History Hooks)
+   History hooks attach FIRST (never blocked by glass code). Toast confirmations
+   show capture is working: "Message saved ✓" / "Reply saved ✓". Clear button added.
    ☰ menu · 🔤 font · 🌏 language · 💾 history drawer · 📌 context folders. All data local. */
 (function () {
   "use strict";
@@ -62,6 +62,9 @@
     "border-left:1px solid rgba(255,255,255,.3);box-shadow:-14px 0 44px rgba(5,25,15,.5);",
     "transition:right .28s ease;color:#eaf6ee;font-size:13px}",
     "#pkDrawer.open{right:0}",
+    "#pkDrawer button{cursor:pointer;border:1px solid rgba(255,255,255,.3);border-radius:10px;",
+    "background:rgba(255,255,255,.12);color:#eaf6ee;padding:5px 12px;font:inherit;font-weight:600}",
+    "#pkDrawer button:hover{background:rgba(255,255,255,.22)}",
     "#pkDrawer .hd{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;",
     "border-bottom:1px solid rgba(255,255,255,.16)}",
     "#pkDrawer .hd b{font-size:14px}",
@@ -80,7 +83,7 @@
     ".pk-slot textarea{min-height:70px;resize:vertical}",
     ".pk-slot .ops{display:flex;align-items:center;gap:8px;font-size:12px}",
     "#pkToast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:100001;display:none;",
-    "padding:8px 18px;border-radius:999px;background:rgba(20,50,36,.75);backdrop-filter:blur(14px);",
+    "padding:8px 18px;border-radius:999px;background:rgba(20,50,36,.8);backdrop-filter:blur(14px);",
     "border:1px solid rgba(255,255,255,.3);color:#fff;font-size:13px;",
     "box-shadow:0 6px 22px rgba(0,0,0,.3)}"
   ].join("");
@@ -97,9 +100,10 @@
   }
   function toast(msg) {
     var t = document.getElementById("pkToast");
+    if (!t) return;
     t.textContent = msg; t.style.display = "block";
     clearTimeout(t.__h);
-    t.__h = setTimeout(function () { t.style.display = "none"; }, 1800);
+    t.__h = setTimeout(function () { t.style.display = "none"; }, 2000);
   }
   function applyZoom() {
     document.body.style.zoom = state.zoom === 1 ? "" : String(state.zoom);
@@ -112,7 +116,183 @@
            /^(SCRIPT|STYLE|LINK|NOSCRIPT)$/.test(elx.tagName);
   }
 
-  /* ---------- background ---------- */
+  /* ---------- history store ---------- */
+  function loadHist() { try { return JSON.parse(localStorage.getItem(LS.hist) || "[]"); } catch (e) { return []; } }
+  function addHist(role, text) {
+    if (!text || typeof text !== "string") return;
+    text = text.trim(); if (!text) return;
+    var h = loadHist();
+    var last = h[h.length - 1];
+    if (last && last.r === role && last.t === text.slice(0, 2000) && Date.now() - last.ts < 8000) return;
+    h.push({ r: role, t: text.slice(0, 2000), ts: Date.now() });
+    try { localStorage.setItem(LS.hist, JSON.stringify(h.slice(-60))); } catch (e) {}
+  }
+
+  /* ---------- AI reply capture (DOM watcher) ---------- */
+  var aiWait = false, aiBuf = "", aiStarted = 0, aiTimer = null, aiSent = "";
+  function aiChunkOk(s) {
+    if (!s) return false;
+    var t = s.trim();
+    if (!t || t.length < 2) return false;
+    if (/processing answer|unreachable|can.?t reach/i.test(t)) return false;
+    if (aiSent) {
+      if (t === aiSent) return false;
+      if (t.indexOf(aiSent) === 0 && t.length < aiSent.length + 30) return false;
+    }
+    return true;
+  }
+  function aiCaptureStart(sent) {
+    aiWait = true; aiBuf = ""; aiStarted = Date.now(); aiSent = (sent || "").trim();
+    clearTimeout(aiTimer);
+    aiTimer = setTimeout(aiCaptureFinish, 30000);
+  }
+  function aiCaptureReset() {
+    clearTimeout(aiTimer);
+    aiTimer = setTimeout(aiCaptureFinish, 1500);
+  }
+  function aiCaptureFinish() {
+    clearTimeout(aiTimer);
+    if (aiWait) {
+      var out = aiBuf.replace(/\s+/g, " ").trim();
+      out = out.replace(/(?:\s*(?:SILA|✓|✔|clear|blocked|warn\w*|unreachable))+$/i, "").trim();
+      if (out.length >= 15) { addHist("a", out); toast("Reply saved ✓"); }
+    }
+    aiWait = false; aiBuf = ""; aiSent = "";
+  }
+  function collectMutation(mut) {
+    var out = "", i, n;
+    for (i = 0; i < mut.addedNodes.length; i++) {
+      n = mut.addedNodes[i];
+      if (n.nodeType === 3) out += " " + (n.nodeValue || "");
+      else if (n.nodeType === 1 && !ours(n) && !(n.closest && n.closest("#pkMenu,#pkDrawer,#pkToast,#pkGlassBg,#pkScrim")))
+        out += " " + (n.textContent || "");
+    }
+    if (mut.type === "characterData" && mut.target && mut.target.nodeValue)
+      out += " " + mut.target.nodeValue;
+    return out;
+  }
+
+  /* ---------- SEND hooks (independent of glass — attach once, capture phase) ---------- */
+  function chatInput() {
+    var list = document.querySelectorAll("textarea, input[type='text']");
+    for (var j = 0; j < list.length; j++) {
+      if (list[j].closest && list[j].closest("#pkDrawer,#pkMenu")) continue;
+      return list[j];
+    }
+    return null;
+  }
+  function onSendAttempt(inp) {
+    var cur = inp || chatInput();
+    var v = cur ? (cur.value || "").trim() : "";
+    if (v) { addHist("u", v); aiCaptureStart(v); toast("Message saved ✓"); }
+  }
+  var hooksDone = false;
+  function hookSend() {
+    if (hooksDone) return;
+    hooksDone = true;
+    /* 1) Enter in the chat input (any input created at any time) */
+    document.addEventListener("keydown", function (e) {
+      try {
+        if (e.key !== "Enter" || e.shiftKey) return;
+        var t = e.target;
+        if (!t || t.nodeType !== 1) return;
+        var isText = t.tagName === "TEXTAREA" || (t.tagName === "INPUT" && (t.type === "text" || !t.type));
+        if (!isText) return;
+        if (t.closest && t.closest("#pkDrawer,#pkMenu")) return;
+        onSendAttempt(t);
+      } catch (err) {}
+    }, true);
+    /* 2) Send button click (button / submit / role=button) */
+    document.addEventListener("click", function (e) {
+      try {
+        var b = e.target && e.target.closest ? e.target.closest("button, input[type='submit'], [role='button']") : null;
+        if (!b || b.id === "pkMenuBtn" || (b.closest && b.closest("#pkMenu,#pkDrawer,#pkToast"))) return;
+        var lbl = (b.textContent || b.value || b.getAttribute && b.getAttribute("aria-label") || "");
+        if (/යවන්න|send|அனுப்பு/i.test(lbl)) onSendAttempt(null);
+      } catch (err) {}
+    }, true);
+    /* 3) Form submit (backup) */
+    document.addEventListener("submit", function (e) {
+      try {
+        var f = e.target;
+        if (!f || !f.querySelectorAll) return;
+        var list = f.querySelectorAll("textarea, input[type='text']");
+        for (var j = 0; j < list.length; j++) {
+          if (list[j].closest && list[j].closest("#pkDrawer,#pkMenu")) continue;
+          var v = (list[j].value || "").trim();
+          if (v) { addHist("u", v); aiCaptureStart(v); toast("Message saved ✓"); }
+          break;
+        }
+      } catch (err) {}
+    }, true);
+  }
+
+  /* ---------- context folders ---------- */
+  function loadCtx() {
+    var a; try { a = JSON.parse(localStorage.getItem(LS.ctx) || "[]"); } catch (e) { a = []; }
+    if (!Array.isArray(a)) a = [];
+    while (a.length < 3) a.push({ name: "", content: "", on: false });
+    return a.slice(0, 3);
+  }
+  function saveCtx(a) { localStorage.setItem(LS.ctx, JSON.stringify(a)); }
+  function activeCtxText() {
+    var a = loadCtx(), parts = [];
+    for (var i = 0; i < a.length; i++) {
+      if (!a[i].on) continue;
+      var nm = (a[i].name || "").trim(), ct = (a[i].content || "").trim();
+      var txt = ct || nm;
+      if (txt) parts.push((nm && ct) ? nm + ": " + ct : txt);
+    }
+    return parts.join(" | ");
+  }
+  function prepareBody(bodyStr) {
+    var obj; try { obj = JSON.parse(bodyStr); } catch (e) { return null; }
+    if (!obj || typeof obj !== "object") return null;
+    var keys = ["message", "prompt", "text", "q", "content"];
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (typeof obj[k] === "string" && obj[k]) {
+        var ctx = activeCtxText();
+        if (ctx) obj[k] = "[Context — applies to all my messages: " + ctx + "]\n" + obj[k];
+        return JSON.stringify(obj);
+      }
+    }
+    return null;
+  }
+  var _fetch = window.fetch;
+  if (_fetch) {
+    window.fetch = function () {
+      var args = [].slice.call(arguments);
+      try {
+        var url = typeof args[0] === "string" ? args[0] : (args[0] && args[0].url) || "";
+        var opts = args[1] = args[1] || {};
+        var method = (opts.method || (args[0] && args[0].method) || "GET").toUpperCase();
+        if (method === "POST" && typeof opts.body === "string") {
+          var nb = prepareBody(opts.body);
+          if (nb) opts.body = nb;
+        }
+      } catch (e) {}
+      return _fetch.apply(this, args);
+    };
+  }
+
+  /* ---------- chat page language ---------- */
+  function applyLang() {
+    var s = CHAT_STRINGS[state.lang] || CHAT_STRINGS.si;
+    var inp = chatInput();
+    if (inp) inp.placeholder = s.placeholder;
+    var btns = document.querySelectorAll("button, input[type='submit']");
+    for (var j = 0; j < btns.length; j++) {
+      var b = btns[j];
+      if (b.id === "pkMenuBtn" || (b.closest && b.closest("#pkMenu,#pkDrawer"))) continue;
+      if (/යවන්න|send|அனுப்பு/i.test((b.textContent || b.value || ""))) {
+        if (b.tagName === "INPUT") b.value = s.send; else b.textContent = s.send;
+        break;
+      }
+    }
+  }
+
+  /* ---------- glass (all wrapped safe) ---------- */
   function buildGlassBg() {
     var bg = el("div"); bg.id = "pkGlassBg";
     bg.innerHTML = '<div class="b b1"></div><div class="b b2"></div><div class="b b3"></div><div class="b b4"></div><div class="b b5"></div>' +
@@ -129,8 +309,6 @@
       else { var z = parseInt(cs.zIndex, 10); if (isNaN(z) || z < 1) k.style.zIndex = 1; }
     }
   }
-
-  /* ---------- LIQUID GLASS ---------- */
   function clearLayers(panel) {
     var kids = panel.querySelectorAll("*");
     for (var i = 0; i < kids.length; i++) {
@@ -204,189 +382,19 @@
     }
   }
   function scan() {
-    var panel = findMainPanel();
-    if (panel) {
-      if (panel.dataset.pkGlass !== "1") { liftContent(); makeLiquid(panel); }
-      else clearLayers(panel);
-    } else liftContent();
-    var all = document.body.querySelectorAll("*");
-    for (var i = 0; i < all.length; i++) {
-      var k = all[i];
-      if (panel && panel.contains(k)) continue;
-      glassify(k);
-    }
-    hookSend();
-  }
-
-  /* ---------- history store ---------- */
-  function loadHist() { try { return JSON.parse(localStorage.getItem(LS.hist) || "[]"); } catch (e) { return []; } }
-  function addHist(role, text) {
-    if (!text || typeof text !== "string") return;
-    text = text.trim(); if (!text) return;
-    var h = loadHist();
-    var last = h[h.length - 1];
-    if (last && last.r === role && last.t === text.slice(0, 2000) && Date.now() - last.ts < 8000) return;
-    h.push({ r: role, t: text.slice(0, 2000), ts: Date.now() });
-    try { localStorage.setItem(LS.hist, JSON.stringify(h.slice(-60))); } catch (e) {}
-  }
-
-  /* ---------- LIVE capture (FIXED) ---------- */
-  var sendHooked = false;
-  var aiWait = false, aiBuf = "", aiStarted = 0, aiTimer = null, aiSent = "";
-
-  function aiChunkOk(s) {
-    if (!s) return false;
-    var t = s.trim();
-    if (!t || t.length < 2) return false;
-    if (/processing answer|unreachable|can.?t reach/i.test(t)) return false;
-    if (aiSent) {
-      if (t === aiSent) return false;
-      if (t.indexOf(aiSent) === 0 && t.length < aiSent.length + 30) return false;
-    }
-    return true;
-  }
-  function aiCaptureStart(sent) {
-    aiWait = true; aiBuf = ""; aiStarted = Date.now(); aiSent = (sent || "").trim();
-    clearTimeout(aiTimer);
-    aiTimer = setTimeout(aiCaptureFinish, 30000);
-  }
-  function aiCaptureReset() {
-    clearTimeout(aiTimer);
-    aiTimer = setTimeout(aiCaptureFinish, 1500);
-  }
-  function aiCaptureFinish() {
-    clearTimeout(aiTimer);
-    if (aiWait) {
-      var out = aiBuf.replace(/\s+/g, " ").trim();
-      out = out.replace(/(?:\s*(?:SILA|✓|✔|clear|blocked|warn\w*|unreachable))+$/i, "").trim();
-      if (out.length >= 15) addHist("a", out);
-    }
-    aiWait = false; aiBuf = ""; aiSent = "";
-  }
-  function collectMutation(mut) {
-    var out = "", i, n;
-    for (i = 0; i < mut.addedNodes.length; i++) {
-      n = mut.addedNodes[i];
-      if (n.nodeType === 3) out += " " + (n.nodeValue || "");
-      else if (n.nodeType === 1 && !ours(n) && !(n.closest && n.closest("#pkMenu,#pkDrawer,#pkToast,#pkGlassBg,#pkScrim")))
-        out += " " + (n.textContent || "");
-    }
-    if (mut.type === "characterData" && mut.target && mut.target.nodeValue)
-      out += " " + mut.target.nodeValue;
-    return out;
-  }
-
-  function chatInput() {
-    var list = document.querySelectorAll("textarea, input[type='text']");
-    for (var j = 0; j < list.length; j++) {
-      if (list[j].closest && list[j].closest("#pkDrawer,#pkMenu")) continue;
-      return list[j];
-    }
-    return null;
-  }
-  function onSendAttempt() {
-    var cur = chatInput();
-    var v = cur ? (cur.value || "").trim() : "";
-    if (v) { addHist("u", v); aiCaptureStart(v); }
-  }
-  function hookSend() {
-    var inp = chatInput();
-    if (inp && !inp.dataset.pkSendHook) {
-      inp.dataset.pkSendHook = "1";
-      inp.addEventListener("keydown", function (e) {
-        if (e.key === "Enter" && !e.shiftKey) onSendAttempt();
-      });
-    }
-    if (sendHooked) return;
-    sendHooked = true;
-    /* Send button click — capture phase = runs before app clears the input */
-    document.addEventListener("click", function (e) {
-      try {
-        var b = e.target && e.target.closest ? e.target.closest("button") : null;
-        if (!b || b.id === "pkMenuBtn" || (b.closest && b.closest("#pkMenu,#pkDrawer,#pkToast"))) return;
-        if (/යවන්න|send|அனுப்பு/i.test(b.textContent || b.value || "") || /send/i.test(b.className || ""))
-          onSendAttempt();
-      } catch (err) {}
-    }, true);
-    /* Form submit — backup path (Enter or button inside a form) */
-    document.addEventListener("submit", function (e) {
-      try {
-        var f = e.target;
-        if (!f || !f.querySelectorAll) return;
-        var list = f.querySelectorAll("textarea, input[type='text']");
-        for (var j = 0; j < list.length; j++) {
-          if (list[j].closest && list[j].closest("#pkDrawer,#pkMenu")) continue;
-          var v = (list[j].value || "").trim();
-          if (v) { addHist("u", v); aiCaptureStart(v); }
-          break;
-        }
-      } catch (err) {}
-    }, true);
-  }
-
-  /* ---------- context folders ---------- */
-  function loadCtx() {
-    var a; try { a = JSON.parse(localStorage.getItem(LS.ctx) || "[]"); } catch (e) { a = []; }
-    if (!Array.isArray(a)) a = [];
-    while (a.length < 3) a.push({ name: "", content: "", on: false });
-    return a.slice(0, 3);
-  }
-  function saveCtx(a) { localStorage.setItem(LS.ctx, JSON.stringify(a)); }
-  function activeCtxText() {
-    var a = loadCtx(), parts = [];
-    for (var i = 0; i < a.length; i++) {
-      if (!a[i].on) continue;
-      var nm = (a[i].name || "").trim(), ct = (a[i].content || "").trim();
-      var txt = ct || nm;
-      if (txt) parts.push((nm && ct) ? nm + ": " + ct : txt);
-    }
-    return parts.join(" | ");
-  }
-  function prepareBody(bodyStr) {
-    var obj; try { obj = JSON.parse(bodyStr); } catch (e) { return null; }
-    if (!obj || typeof obj !== "object") return null;
-    var keys = ["message", "prompt", "text", "q", "content"];
-    for (var i = 0; i < keys.length; i++) {
-      var k = keys[i];
-      if (typeof obj[k] === "string" && obj[k]) {
-        var ctx = activeCtxText();
-        if (ctx) obj[k] = "[Context — applies to all my messages: " + ctx + "]\n" + obj[k];
-        return JSON.stringify(obj);
+    try {
+      var panel = findMainPanel();
+      if (panel) {
+        if (panel.dataset.pkGlass !== "1") { liftContent(); makeLiquid(panel); }
+        else clearLayers(panel);
+      } else liftContent();
+      var all = document.body.querySelectorAll("*");
+      for (var i = 0; i < all.length; i++) {
+        var k = all[i];
+        if (panel && panel.contains(k)) continue;
+        glassify(k);
       }
-    }
-    return null;
-  }
-  var _fetch = window.fetch;
-  if (_fetch) {
-    window.fetch = function () {
-      var args = [].slice.call(arguments);
-      try {
-        var url = typeof args[0] === "string" ? args[0] : (args[0] && args[0].url) || "";
-        var opts = args[1] = args[1] || {};
-        var method = (opts.method || (args[0] && args[0].method) || "GET").toUpperCase();
-        if (method === "POST" && /\/chat/.test(url) && typeof opts.body === "string") {
-          var nb = prepareBody(opts.body);
-          if (nb) opts.body = nb;
-        }
-      } catch (e) {}
-      return _fetch.apply(this, args);
-    };
-  }
-
-  /* ---------- chat page language ---------- */
-  function applyLang() {
-    var s = CHAT_STRINGS[state.lang] || CHAT_STRINGS.si;
-    var inp = chatInput();
-    if (inp) inp.placeholder = s.placeholder;
-    var btns = document.querySelectorAll("button, input[type='submit']");
-    for (var j = 0; j < btns.length; j++) {
-      var b = btns[j];
-      if (b.id === "pkMenuBtn" || (b.closest && b.closest("#pkMenu,#pkDrawer"))) continue;
-      if (/යවන්න|send|அனுப்பு/i.test((b.textContent || b.value || ""))) {
-        if (b.tagName === "INPUT") b.value = s.send; else b.textContent = s.send;
-        break;
-      }
-    }
+    } catch (e) {}
   }
 
   /* ---------- drawer views ---------- */
@@ -486,8 +494,13 @@
     var drawer = el("div"); drawer.id = "pkDrawer";
     var hd = el("div", "hd");
     var title = el("b", null, "History");
+    var hdR = el("div");
+    hdR.style.display = "flex"; hdR.style.gap = "8px";
+    var clearB = el("button", null, "🗑");
     var close = el("button", null, "✕");
-    hd.appendChild(title); hd.appendChild(close);
+    clearB.title = "Clear history";
+    hdR.appendChild(clearB); hdR.appendChild(close);
+    hd.appendChild(title); hd.appendChild(hdR);
     var bd = el("div", "bd");
     var vHist = el("div"), vCtx = el("div"); vCtx.style.display = "none";
     bd.appendChild(vHist); bd.appendChild(vCtx);
@@ -496,6 +509,7 @@
 
     function openDrawer(which) {
       title.textContent = which === "ctx" ? "Context folders" : "History";
+      clearB.style.display = which === "hist" ? "inline-block" : "none";
       vHist.style.display = which === "ctx" ? "none" : "block";
       vCtx.style.display = which === "ctx" ? "block" : "none";
       if (which === "ctx") renderContextView(vCtx); else renderHistoryView(vHist);
@@ -505,6 +519,13 @@
     function closeDrawer() { scrim.classList.remove("open"); drawer.classList.remove("open"); }
     bHist.onclick = function () { openDrawer("hist"); };
     bCtx.onclick = function () { openDrawer("ctx"); };
+    clearB.onclick = function () {
+      if (confirm("Clear history?")) {
+        localStorage.removeItem(LS.hist);
+        renderHistoryView(vHist);
+        toast("History cleared");
+      }
+    };
     close.onclick = closeDrawer;
     scrim.onclick = closeDrawer;
     document.addEventListener("keydown", function (e) { if (e.key === "Escape") { closeDrawer(); menu.classList.remove("open"); } });
@@ -514,6 +535,7 @@
   function init() {
     buildGlassBg();
     buildUI();
+    hookSend();          /* FIRST & independent — history never blocked by glass */
     applyLang();
     if (state.zoom !== 1) applyZoom();
     requestAnimationFrame(function () {
