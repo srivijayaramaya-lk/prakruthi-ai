@@ -207,7 +207,7 @@ CHAT_HTML = """<!DOCTYPE html>
   body { font-family: 'Segoe UI','Nirmala UI','Noto Color Emoji',sans-serif;
          background: linear-gradient(135deg,#e8f5e9,#f1f8e9);
          min-height: 100vh; display: flex; justify-content: center; }
-  .app { width: 100%; max-width: 640px; min-height: 100vh; background: #fff;
+  .app { width: 100%; max-width: 640px; height: 100vh; background: #fff;
          display: flex; flex-direction: column; box-shadow: 0 0 24px rgba(0,0,0,.08); }
   header { padding: 14px 18px; background: #1b5e20; color: #fff; }
   header h1 { font-size: 18px; display: flex; justify-content: space-between; }
