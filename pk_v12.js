@@ -1,5 +1,5 @@
 /* ප්‍රකෘති AI v1.2 client — 📷 vision + 👤 accounts + ☁ sync + 🪷 wake screen
-   v1.2.1: menu match — "See Account ☁ below" text එකත් හම්බවෙනවා */
+   v1.2.2: 📷 button flex-aware — ඕනෑම input layout එකක පේනවා */
 (function () {
   "use strict";
   if (window.__pkV12) return;
@@ -34,10 +34,6 @@
     "#pkWake .t{margin-top:12px;font-size:15px;text-shadow:0 1px 3px rgba(0,0,0,.4)}",
     "#pkWake .s{margin-top:6px;font-size:12px;opacity:.85}",
     "@keyframes pkPulse{0%,100%{transform:scale(.9);opacity:.6}50%{transform:scale(1.15);opacity:1}}",
-    "#pkCamBtn{position:absolute;left:10px;bottom:10px;z-index:5;width:38px;height:38px;border-radius:50%;",
-    "border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.16);backdrop-filter:blur(12px);",
-    "-webkit-backdrop-filter:blur(12px);color:#fff;font-size:17px;cursor:pointer}",
-    "#pkCamBtn:hover{background:rgba(255,255,255,.3)}",
     "#pkImgChip{position:absolute;bottom:calc(100% + 8px);left:8px;display:none;align-items:center;gap:8px;padding:6px;",
     "border-radius:14px;background:rgba(15,45,30,.55);backdrop-filter:blur(16px);",
     "-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.35);z-index:6}",
@@ -94,8 +90,11 @@
   function chatInput() {
     var list = document.querySelectorAll("textarea, input[type='text']");
     for (var j = 0; j < list.length; j++) {
-      if (list[j].closest && list[j].closest("#pkDrawer,#pkMenu,#pkAccCard,#pkWake")) continue;
-      return list[j];
+      var it = list[j];
+      if (it.closest && it.closest("#pkDrawer,#pkMenu,#pkAccCard,#pkWake")) continue;
+      var r = it.getBoundingClientRect ? it.getBoundingClientRect() : { width: 10, height: 10 };
+      if (r.width < 10 || r.height < 10) continue; /* hidden inputs skip */
+      return it;
     }
     return null;
   }
@@ -139,8 +138,6 @@
     var inp = chatInput();
     if (!inp || $("pkCamBtn")) return;
     var host = inp.parentElement; if (!host) return;
-    if (getComputedStyle(host).position === "static") host.style.position = "relative";
-    inp.style.paddingLeft = "48px";
     var btn = document.createElement("button");
     btn.id = "pkCamBtn"; btn.type = "button"; btn.title = "පින්තූරයක් යවන්න"; btn.textContent = "📷";
     var file = document.createElement("input");
@@ -165,7 +162,24 @@
     var chip = document.createElement("div"); chip.id = "pkImgChip";
     chip.innerHTML = '<img alt=""><span></span><button type="button" title="අයින් කරන්න">✕</button>';
     chip.querySelector("button").onclick = clearImage;
-    host.appendChild(btn); host.appendChild(file); host.appendChild(chip);
+
+    var cs; try { cs = getComputedStyle(host); } catch (e) { cs = { position: "static", display: "block", flexDirection: "row" }; }
+    var isFlexRow = cs.display.indexOf("flex") === 0 && cs.flexDirection === "row";
+    if (isFlexRow) {
+      /* flex row → button = first flex item (input එකට වමෙන්) */
+      if (host.firstChild) host.insertBefore(btn, host.firstChild); else host.appendChild(btn);
+      host.insertBefore(file, btn.nextSibling);
+      host.insertBefore(chip, file.nextSibling);
+      btn.style.cssText = "flex:0 0 auto;width:40px;height:40px;margin:0;border-radius:12px;" +
+        "border:1px solid rgba(0,0,0,.15);background:#fff;font-size:17px;cursor:pointer;line-height:1";
+    } else {
+      if (cs.position === "static") host.style.position = "relative";
+      inp.style.paddingLeft = "48px";
+      btn.style.cssText = "position:absolute;left:10px;bottom:10px;z-index:5;width:38px;height:38px;" +
+        "border-radius:50%;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.16);" +
+        "backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:#fff;font-size:17px;cursor:pointer;line-height:1";
+      host.appendChild(btn); host.appendChild(file); host.appendChild(chip);
+    }
   }
 
   /* ---------- 📷 send takeover ---------- */
@@ -199,7 +213,7 @@
     if (!pendingImage) return;
     var b = e.target.closest && e.target.closest("button, input[type='submit']");
     if (!b || b.id === "pkCamBtn" || (b.closest && b.closest("#pkImgChip,#pkMenu,#pkDrawer"))) return;
-    if (/යවන්න|send|அனுப்பு/i.test(b.textContent || b.value || "")) {
+    if (/යවන්න|send|அனுඪ்பு/i.test(b.textContent || b.value || "")) {
       e.preventDefault(); e.stopPropagation();
       var inp = chatInput();
       sendVision(inp ? (inp.value || "").trim() : "");
