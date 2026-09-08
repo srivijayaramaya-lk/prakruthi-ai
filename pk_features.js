@@ -1,6 +1,6 @@
-/* ප්‍රකෘති AI — UI Pack v1.6 (Liquid Glass + Live History Capture)
-   Glass: iOS-26 style clear panels. History: captures directly from the chat UI
-   (input on Send/Enter + AI reply via DOM watcher) — no dependence on request format.
+/* ප්‍රකෘති AI — UI Pack v1.6.1 (Liquid Glass + Fixed History Capture)
+   Fix: click/submit capture now attaches correctly (v1.6 crash bug removed).
+   History captures from the chat UI: input on Send/Enter/Submit + AI reply via DOM watcher.
    ☰ menu · 🔤 font · 🌏 language · 💾 history drawer · 📌 context folders. All data local. */
 (function () {
   "use strict";
@@ -230,36 +230,41 @@
     try { localStorage.setItem(LS.hist, JSON.stringify(h.slice(-60))); } catch (e) {}
   }
 
-  /* ---------- LIVE capture: user sends + AI reply ---------- */
+  /* ---------- LIVE capture (FIXED) ---------- */
+  var sendHooked = false;
   var aiWait = false, aiBuf = "", aiStarted = 0, aiTimer = null, aiSent = "";
 
   function aiChunkOk(s) {
     if (!s) return false;
     var t = s.trim();
-    if (!t) return false;
-    if (t === aiSent || (aiSent && t.indexOf(aiSent) !== -1)) return false;   /* user bubble / re-render */
-    if (t.length < 8) return false;
-    if (/proc|SILA|lotus|clear|unreachable|Can't reach|can.t reach/i.test(t)) return false;
+    if (!t || t.length < 2) return false;
+    if (/processing answer|unreachable|can.?t reach/i.test(t)) return false;
+    if (aiSent) {
+      if (t === aiSent) return false;
+      if (t.indexOf(aiSent) === 0 && t.length < aiSent.length + 30) return false;
+    }
     return true;
   }
   function aiCaptureStart(sent) {
     aiWait = true; aiBuf = ""; aiStarted = Date.now(); aiSent = (sent || "").trim();
     clearTimeout(aiTimer);
-    aiTimer = setTimeout(aiCaptureFinish, 30000); /* safety: 30s max wait */
+    aiTimer = setTimeout(aiCaptureFinish, 30000);
   }
   function aiCaptureReset() {
     clearTimeout(aiTimer);
-    aiTimer = setTimeout(aiCaptureFinish, 1500); /* quiet period = reply complete */
-    if (Date.now() - aiStarted > 180000) aiCaptureFinish();
+    aiTimer = setTimeout(aiCaptureFinish, 1500);
   }
   function aiCaptureFinish() {
     clearTimeout(aiTimer);
-    if (aiWait && aiBuf.trim().length >= 15) addHist("a", aiBuf);
+    if (aiWait) {
+      var out = aiBuf.replace(/\s+/g, " ").trim();
+      out = out.replace(/(?:\s*(?:SILA|✓|✔|clear|blocked|warn\w*|unreachable))+$/i, "").trim();
+      if (out.length >= 15) addHist("a", out);
+    }
     aiWait = false; aiBuf = ""; aiSent = "";
   }
   function collectMutation(mut) {
-    var out = "";
-    var i, n;
+    var out = "", i, n;
     for (i = 0; i < mut.addedNodes.length; i++) {
       n = mut.addedNodes[i];
       if (n.nodeType === 3) out += " " + (n.nodeValue || "");
@@ -271,38 +276,51 @@
     return out;
   }
 
-  function hookSend() {
-    /* attach to the chat input (skip our own drawer fields) */
-    var inputs = document.querySelectorAll("textarea, input[type='text']");
-    var inp = null;
-    for (var i = 0; i < inputs.length; i++) {
-      if (inputs[i].closest && inputs[i].closest("#pkDrawer,#pkMenu")) continue;
-      inp = inputs[i]; break;
+  function chatInput() {
+    var list = document.querySelectorAll("textarea, input[type='text']");
+    for (var j = 0; j < list.length; j++) {
+      if (list[j].closest && list[j].closest("#pkDrawer,#pkMenu")) continue;
+      return list[j];
     }
+    return null;
+  }
+  function onSendAttempt() {
+    var cur = chatInput();
+    var v = cur ? (cur.value || "").trim() : "";
+    if (v) { addHist("u", v); aiCaptureStart(v); }
+  }
+  function hookSend() {
+    var inp = chatInput();
     if (inp && !inp.dataset.pkSendHook) {
       inp.dataset.pkSendHook = "1";
       inp.addEventListener("keydown", function (e) {
-        if (e.key === "Enter" && !e.shiftKey) {
-          var v = (inp.value || "").trim();
-          if (v) { addHist("u", v); aiCaptureStart(v); }
-        }
+        if (e.key === "Enter" && !e.shiftKey) onSendAttempt();
       });
     }
-    if (document.dataset && document.dataset.pkClickHook) return;
-    document.dataset.pkClickHook = "1";
+    if (sendHooked) return;
+    sendHooked = true;
+    /* Send button click — capture phase = runs before app clears the input */
     document.addEventListener("click", function (e) {
-      var b = e.target && e.target.closest ? e.target.closest("button") : null;
-      if (!b || b.id === "pkMenuBtn" || (b.closest && b.closest("#pkMenu,#pkDrawer"))) return;
-      if (/යවන්න|send|அனுப்பு|paper|➤|➢|↗/i.test(b.textContent || b.value || "") || /send/i.test(b.className || "")) {
-        var cur = null;
-        var list = document.querySelectorAll("textarea, input[type='text']");
+      try {
+        var b = e.target && e.target.closest ? e.target.closest("button") : null;
+        if (!b || b.id === "pkMenuBtn" || (b.closest && b.closest("#pkMenu,#pkDrawer,#pkToast"))) return;
+        if (/යවන්න|send|அனுப்பு/i.test(b.textContent || b.value || "") || /send/i.test(b.className || ""))
+          onSendAttempt();
+      } catch (err) {}
+    }, true);
+    /* Form submit — backup path (Enter or button inside a form) */
+    document.addEventListener("submit", function (e) {
+      try {
+        var f = e.target;
+        if (!f || !f.querySelectorAll) return;
+        var list = f.querySelectorAll("textarea, input[type='text']");
         for (var j = 0; j < list.length; j++) {
           if (list[j].closest && list[j].closest("#pkDrawer,#pkMenu")) continue;
-          cur = list[j]; break;
+          var v = (list[j].value || "").trim();
+          if (v) { addHist("u", v); aiCaptureStart(v); }
+          break;
         }
-        var v = cur ? (cur.value || "").trim() : "";
-        if (v) { addHist("u", v); aiCaptureStart(v); }
-      }
+      } catch (err) {}
     }, true);
   }
 
@@ -319,7 +337,7 @@
     for (var i = 0; i < a.length; i++) {
       if (!a[i].on) continue;
       var nm = (a[i].name || "").trim(), ct = (a[i].content || "").trim();
-      var txt = ct || nm; /* either box works */
+      var txt = ct || nm;
       if (txt) parts.push((nm && ct) ? nm + ": " + ct : txt);
     }
     return parts.join(" | ");
@@ -358,11 +376,8 @@
   /* ---------- chat page language ---------- */
   function applyLang() {
     var s = CHAT_STRINGS[state.lang] || CHAT_STRINGS.si;
-    var inputs = document.querySelectorAll("textarea, input[type='text']");
-    for (var i = 0; i < inputs.length; i++) {
-      if (inputs[i].closest && inputs[i].closest("#pkDrawer,#pkMenu")) continue;
-      inputs[i].placeholder = s.placeholder; break;
-    }
+    var inp = chatInput();
+    if (inp) inp.placeholder = s.placeholder;
     var btns = document.querySelectorAll("button, input[type='submit']");
     for (var j = 0; j < btns.length; j++) {
       var b = btns[j];
@@ -506,15 +521,18 @@
     });
     var pending = null;
     new MutationObserver(function (muts) {
-      if (aiWait) {
-        for (var i = 0; i < muts.length; i++) {
-          var chunk = collectMutation(muts[i]);
-          if (aiChunkOk(chunk)) {
-            aiBuf += " " + chunk.trim();
-            aiCaptureReset();
+      try {
+        if (aiWait) {
+          for (var i = 0; i < muts.length; i++) {
+            var chunk = collectMutation(muts[i]);
+            if (aiChunkOk(chunk)) {
+              var t = chunk.trim();
+              aiBuf += (t.length === 1 ? t : " " + t);
+              aiCaptureReset();
+            }
           }
         }
-      }
+      } catch (err) {}
       if (!pending) pending = requestAnimationFrame(function () {
         pending = null; scan();
       });
