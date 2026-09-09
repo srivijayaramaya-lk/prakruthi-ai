@@ -200,6 +200,9 @@ CHAT_HTML = """<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Prakruthi AI</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#1b5e20">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%231b5e20'/><text x='32' y='45' font-size='38' text-anchor='middle' fill='white' font-family='Arial'>P</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&display=swap" rel="stylesheet">
@@ -356,6 +359,9 @@ btn.onclick = send;
 input.addEventListener("keydown", e => { if (e.key === "Enter") send(); });
 input.focus();
 </script>
+<script>
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(function(){});
+</script>
 <script src="/pk_features.js"></script>
 <script src="/pk_v12.js"></script>
 </body>
@@ -367,6 +373,25 @@ from fastapi.responses import FileResponse
 @app.get("/pk_features.js")
 def pk_features_js():
     return FileResponse("pk_features.js", media_type="application/javascript")
+
+# ---------- v1.2 PWA (manifest + sw + icons) ----------
+from fastapi.responses import FileResponse as _FR
+
+@app.get("/manifest.json")
+def pwa_manifest():
+    return _FR("manifest.json", media_type="application/json")
+
+@app.get("/sw.js")
+def pwa_sw():
+    return _FR("sw.js", media_type="application/javascript")
+
+@app.get("/icon-192.png")
+def icon192():
+    return _FR("icon-192.png", media_type="image/png")
+
+@app.get("/icon-512.png")
+def icon512():
+    return _FR("icon-512.png", media_type="image/png")
 
 app.include_router(pk_router)
 

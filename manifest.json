@@ -1,0 +1,24 @@
+{
+  "name": "ප්‍රකෘති AI",
+  "short_name": "ප්‍රකෘති",
+  "description": "Sila AI safety guardrail chatbot — Sinhala, Tamil, English",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d2a1e",
+  "theme_color": "#1b5e20",
+  "lang": "si",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
