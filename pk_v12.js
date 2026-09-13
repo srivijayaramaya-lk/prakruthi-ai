@@ -1,11 +1,13 @@
-/* ප්‍රකෘති AI v1.2 client — 📷 vision + 👤 accounts + ☁ sync + 🪷 wake screen
-   v1.2.2: 📷 button flex-aware — ඕනෑම input layout එකක පේනවා */
+/* ප්‍රකෘති AI v1.3 client — 📷 vision + photo memory + 👤 accounts + ☁ sync + 🪷 wake screen */
 (function () {
   "use strict";
   if (window.__pkV12) return;
   window.__pkV12 = true;
   var K = { tok: "pk_token", user: "pk_user", sync: "pk_sync", last: "pk_last_sync" };
-  var pendingImage = null;
+  var pendingImage = null;      /* දැන් attach කරලා තියෙන අලුත් පින්තූරය */
+  var contextPhoto = null;      /* මතකයේ තියෙන පරණ පින්තූරය (follow-ups) */
+  var contextPhotoTs = 0;       /* ඒක යැව්ව වෙලාව */
+  var CTX_MS = 5 * 60 * 1000;   /* මතකයේ තියෙන කාලය: විනාඩි 5 */
 
   function $(id) { return document.getElementById(id); }
   function tok() { return localStorage.getItem(K.tok) || ""; }
@@ -40,6 +42,11 @@
     "#pkImgChip img{width:46px;height:46px;object-fit:cover;border-radius:9px;display:block}",
     "#pkImgChip span{color:#eaf6ee;font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
     "#pkImgChip button{border:none;background:none;color:#fff;font-size:15px;cursor:pointer}",
+    "#pkCtxChip{position:absolute;bottom:calc(100% + 8px);left:8px;display:none;align-items:center;gap:8px;padding:6px 10px;",
+    "border-radius:14px;background:rgba(15,45,30,.55);backdrop-filter:blur(16px);",
+    "-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.35);z-index:6}",
+    "#pkCtxChip span{color:#eaf6ee;font-size:12px}",
+    "#pkCtxChip button{border:none;background:none;color:#fff;font-size:15px;cursor:pointer}",
     ".pkv-msg{max-width:85%;padding:10px 14px;border-radius:14px;line-height:1.5;white-space:pre-wrap;",
     "word-wrap:break-word;margin:6px 0;font-size:14.5px}",
     ".pkv-u{align-self:flex-end;background:#c8e6c9;border-radius:14px 14px 4px 14px}",
@@ -66,9 +73,7 @@
     '<div class="t">ප්‍රකෘති අවදි වෙනවා…</div><div class="s">විනාඩියක් ඉන්න</div></div>';
   document.body.appendChild(wake);
   var wakeShown = 0;
-  function wakeShow() {
-    if (!wakeShown) { wakeShown = Date.now(); wake.style.display = "flex"; }
-  }
+  function wakeShow() { if (!wakeShown) { wakeShown = Date.now(); wake.style.display = "flex"; } }
   function wakeHide() { wake.style.display = "none"; }
   function wakeCheck(tries) {
     fetch("/api/pk_health", { cache: "no-store" })
@@ -88,12 +93,12 @@
 
   /* ---------- 📷 camera ---------- */
   function chatInput() {
-    var list = document.querySelectorAll("textarea, input[type='text'], input:not([type])");
+    var list = document.querySelectorAll("textarea, input");
     for (var j = 0; j < list.length; j++) {
       var it = list[j];
       if (it.closest && it.closest("#pkDrawer,#pkMenu,#pkAccCard,#pkWake")) continue;
       var r = it.getBoundingClientRect ? it.getBoundingClientRect() : { width: 10, height: 10 };
-      if (r.width < 10 || r.height < 10) continue; /* hidden inputs skip */
+      if (r.width < 10 || r.height < 10) continue;
       return it;
     }
     return null;
@@ -134,6 +139,18 @@
     pendingImage = null;
     var chip = $("pkImgChip"); if (chip) chip.style.display = "none";
   }
+
+  /* ---------- 📷 photo memory chip ---------- */
+  function ctxFresh() { return contextPhoto && (Date.now() - contextPhotoTs) < CTX_MS; }
+  function showCtxChip() {
+    var chip = $("pkCtxChip"); if (!chip) return;
+    chip.style.display = "flex";
+  }
+  function clearCtxChip() {
+    contextPhoto = null; contextPhotoTs = 0;
+    var chip = $("pkCtxChip"); if (chip) chip.style.display = "none";
+  }
+
   function buildCamera() {
     var inp = chatInput();
     if (!inp || $("pkCamBtn")) return;
@@ -153,6 +170,7 @@
         chip.querySelector("img").src = dataUrl;
         chip.querySelector("span").textContent = f.name || "photo";
         chip.style.display = "flex";
+        $("pkCtxChip").style.display = "none"; /* අලුත් එකක් attach — පරණ memory chip එක සැඟවනවා */
         var inp2 = chatInput();
         if (inp2 && !(inp2.value || "").trim()) inp2.value = "මේ මොකක්ද?";
         toast("පින්තූරය attach වුණා ✓ යවන්න");
@@ -162,14 +180,18 @@
     var chip = document.createElement("div"); chip.id = "pkImgChip";
     chip.innerHTML = '<img alt=""><span></span><button type="button" title="අයින් කරන්න">✕</button>';
     chip.querySelector("button").onclick = clearImage;
+    var ctx = document.createElement("div"); ctx.id = "pkCtxChip";
+    ctx.innerHTML = '<span>📷 ඡායාරූපය මතකයේ — ප්‍රශ්න අහන්න</span>' +
+      '<button type="button" title="මතකයෙන් අයින් කරන්න">✕</button>';
+    ctx.querySelector("button").onclick = function () { clearCtxChip(); toast("ඡායාරූප මතකය ඉවත් වුණා"); };
 
     var cs; try { cs = getComputedStyle(host); } catch (e) { cs = { position: "static", display: "block", flexDirection: "row" }; }
     var isFlexRow = cs.display.indexOf("flex") === 0 && cs.flexDirection === "row";
     if (isFlexRow) {
-      /* flex row → button = first flex item (input එකට වමෙන්) */
       if (host.firstChild) host.insertBefore(btn, host.firstChild); else host.appendChild(btn);
       host.insertBefore(file, btn.nextSibling);
       host.insertBefore(chip, file.nextSibling);
+      host.insertBefore(ctx, chip.nextSibling);
       btn.style.cssText = "flex:0 0 auto;width:40px;height:40px;margin:0;border-radius:12px;" +
         "border:1px solid rgba(0,0,0,.15);background:#fff;font-size:17px;cursor:pointer;line-height:1";
     } else {
@@ -178,46 +200,65 @@
       btn.style.cssText = "position:absolute;left:10px;bottom:10px;z-index:5;width:38px;height:38px;" +
         "border-radius:50%;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.16);" +
         "backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:#fff;font-size:17px;cursor:pointer;line-height:1";
-      host.appendChild(btn); host.appendChild(file); host.appendChild(chip);
+      host.appendChild(btn); host.appendChild(file); host.appendChild(chip); host.appendChild(ctx);
     }
   }
 
-  /* ---------- 📷 send takeover ---------- */
-  function sendVision(text) {
+  /* ---------- 📷 send (අලුත් පින්තූරයක් හෝ මතකයේ තියෙන එක) ---------- */
+  function sendVision(text, img) {
     var inp = chatInput();
     var box = chatBox(inp);
     if (inp) inp.value = "";
-    var img = pendingImage; clearImage();
+    if (!img) return;
     if (text) box.appendChild(bubble("pkv-u", text));
     var wait = bubble("pkv-a", "🪷 පින්තූරය බලනවා…");
     box.appendChild(wait); box.scrollTop = box.scrollHeight;
     var headers = { "Content-Type": "application/json" };
     if (tok()) headers.Authorization = "Bearer " + tok();
-    fetch("/api/vision", { method: "POST", headers: headers, body: JSON.stringify({ message: text, image: img }) })
+    fetch("/api/vision", { method: "POST", headers: headers, body: JSON.stringify({ message: text || "මේ ගැන තව කියන්න", image: img }) })
       .then(function (r) { return r.json(); })
       .then(function (d) {
         wait.textContent = d && d.reply ? d.reply : "⚠ " + ((d && d.error) || "fail");
         box.scrollTop = box.scrollHeight;
+        if (d && d.reply) {
+          contextPhoto = img; contextPhotoTs = Date.now(); /* මතකය අලුත් කරනවා */
+          showCtxChip();
+        }
       })
       .catch(function () { wait.textContent = "⚠ ජාලය — නැවත උත්සාහ කරන්න"; });
   }
+  function tryVisionSend(text) {
+    /* 1) අලුතින් attach කරපු පින්තූරයක් තියෙනවා නම් — ඒක යවනවා */
+    if (pendingImage) {
+      var img = pendingImage; clearImage();
+      sendVision(text, img);
+      return true;
+    }
+    /* 2) මතකයේ තියෙන පින්තූරයක් fresh නම් — follow-up එක ඒක එක්ක යනවා */
+    if (ctxFresh()) {
+      sendVision(text, contextPhoto);
+      return true;
+    }
+    if (contextPhoto && !ctxFresh()) clearCtxChip(); /* කල් ඉකුත් වුණා නම් ඉවත් */
+    return false;
+  }
   document.addEventListener("keydown", function (e) {
-    if (!pendingImage || e.key !== "Enter" || e.shiftKey) return;
+    if (e.key !== "Enter" || e.shiftKey) return;
     var t = e.target;
     if (!t || (t.tagName !== "TEXTAREA" && t.tagName !== "INPUT")) return;
     if (t.closest && t.closest("#pkDrawer,#pkMenu,#pkAccCard,#pkWake")) return;
-    e.preventDefault(); e.stopPropagation();
-    sendVision((t.value || "").trim());
+    var text = (t.value || "").trim();
+    if (!text) return;
+    if (tryVisionSend(text)) { e.preventDefault(); e.stopPropagation(); }
   }, true);
   document.addEventListener("click", function (e) {
-    if (!pendingImage) return;
     var b = e.target.closest && e.target.closest("button, input[type='submit']");
-    if (!b || b.id === "pkCamBtn" || (b.closest && b.closest("#pkImgChip,#pkMenu,#pkDrawer"))) return;
-    if (/යවන්න|send|அனுඪ்பு/i.test(b.textContent || b.value || "")) {
-      e.preventDefault(); e.stopPropagation();
-      var inp = chatInput();
-      sendVision(inp ? (inp.value || "").trim() : "");
-    }
+    if (!b || b.id === "pkCamBtn" || (b.closest && b.closest("#pkImgChip,#pkCtxChip,#pkMenu,#pkDrawer"))) return;
+    if (!/යවන්න|send|அனுப்பு/i.test(b.textContent || b.value || "")) return;
+    var inp = chatInput();
+    var text = inp ? (inp.value || "").trim() : "";
+    if (!text) return;
+    if (tryVisionSend(text)) { e.preventDefault(); e.stopPropagation(); }
   }, true);
 
   /* ---------- 👤 accounts ---------- */
