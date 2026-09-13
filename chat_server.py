@@ -393,6 +393,10 @@ def icon192():
 def icon512():
     return _FR("icon-512.png", media_type="image/png")
 
+@app.get("/.well-known/assetlinks.json")
+def assetlinks():
+    return _FR("assetlinks.json", media_type="application/json")
+
 app.include_router(pk_router)
 
 if __name__ == "__main__":

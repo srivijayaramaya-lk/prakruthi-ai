@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.onrender.prakruthi_ai.twa",
+        "sha256_cert_fingerprints": ["18:52:86:15:6D:A8:E5:39:58:55:71:59:94:CB:A0:21:4C:07:76:BE:D7:07:9C:60:4A:CD:DA:B1:2B:E9:28:B8"]
+      }
+    }]
