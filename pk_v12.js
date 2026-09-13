@@ -1,4 +1,5 @@
-/* ප්‍රකෘති AI v1.3 client — 📷 vision + photo memory + 👤 accounts + ☁ sync + 🪷 wake screen */
+/* ප්‍රකෘති AI v1.3 client — 📷 vision + photo memory + 👤 accounts + ☁ sync + 🪷 wake screen
+   base: v1.2.2 (precise input selector + flex-aware camera) */
 (function () {
   "use strict";
   if (window.__pkV12) return;
@@ -6,7 +7,7 @@
   var K = { tok: "pk_token", user: "pk_user", sync: "pk_sync", last: "pk_last_sync" };
   var pendingImage = null;      /* දැන් attach කරලා තියෙන අලුත් පින්තූරය */
   var contextPhoto = null;      /* මතකයේ තියෙන පරණ පින්තූරය (follow-ups) */
-  var contextPhotoTs = 0;       /* ඒක යැව්ව වෙලාව */
+  var contextPhotoTs = 0;
   var CTX_MS = 5 * 60 * 1000;   /* මතකයේ තියෙන කාලය: විනාඩි 5 */
 
   function $(id) { return document.getElementById(id); }
@@ -73,7 +74,9 @@
     '<div class="t">ප්‍රකෘති අවදි වෙනවා…</div><div class="s">විනාඩියක් ඉන්න</div></div>';
   document.body.appendChild(wake);
   var wakeShown = 0;
-  function wakeShow() { if (!wakeShown) { wakeShown = Date.now(); wake.style.display = "flex"; } }
+  function wakeShow() {
+    if (!wakeShown) { wakeShown = Date.now(); wake.style.display = "flex"; }
+  }
   function wakeHide() { wake.style.display = "none"; }
   function wakeCheck(tries) {
     fetch("/api/pk_health", { cache: "no-store" })
@@ -93,12 +96,12 @@
 
   /* ---------- 📷 camera ---------- */
   function chatInput() {
-    var list = document.querySelectorAll("textarea, input");
+    var list = document.querySelectorAll("textarea, input[type='text'], input:not([type])");
     for (var j = 0; j < list.length; j++) {
       var it = list[j];
       if (it.closest && it.closest("#pkDrawer,#pkMenu,#pkAccCard,#pkWake")) continue;
       var r = it.getBoundingClientRect ? it.getBoundingClientRect() : { width: 10, height: 10 };
-      if (r.width < 10 || r.height < 10) continue;
+      if (r.width < 10 || r.height < 10) continue; /* hidden inputs skip */
       return it;
     }
     return null;
@@ -140,16 +143,16 @@
     var chip = $("pkImgChip"); if (chip) chip.style.display = "none";
   }
 
-  /* ---------- 📷 photo memory chip ---------- */
+  /* ---------- 📷 photo memory (v1.3) ---------- */
   function ctxFresh() { return contextPhoto && (Date.now() - contextPhotoTs) < CTX_MS; }
   function showCtxChip() {
-    var chip = $("pkCtxChip"); if (!chip) return;
-    chip.style.display = "flex";
+    var chip = $("pkCtxChip"); if (chip) chip.style.display = "flex";
   }
   function clearCtxChip() {
     contextPhoto = null; contextPhotoTs = 0;
     var chip = $("pkCtxChip"); if (chip) chip.style.display = "none";
   }
+  setInterval(function () { if (contextPhoto && !ctxFresh()) clearCtxChip(); }, 30000);
 
   function buildCamera() {
     var inp = chatInput();
@@ -170,7 +173,7 @@
         chip.querySelector("img").src = dataUrl;
         chip.querySelector("span").textContent = f.name || "photo";
         chip.style.display = "flex";
-        $("pkCtxChip").style.display = "none"; /* අලුත් එකක් attach — පරණ memory chip එක සැඟවනවා */
+        $("pkCtxChip").style.display = "none"; /* අලුත් එක attach — පරණ memory chip සැඟවෙනවා */
         var inp2 = chatInput();
         if (inp2 && !(inp2.value || "").trim()) inp2.value = "මේ මොකක්ද?";
         toast("පින්තූරය attach වුණා ✓ යවන්න");
@@ -204,7 +207,7 @@
     }
   }
 
-  /* ---------- 📷 send (අලුත් පින්තූරයක් හෝ මතකයේ තියෙන එක) ---------- */
+  /* ---------- 📷 send (අලුත් පින්තූරයක් හෝ මතකයේ එක) ---------- */
   function sendVision(text, img) {
     var inp = chatInput();
     var box = chatBox(inp);
@@ -215,7 +218,7 @@
     box.appendChild(wait); box.scrollTop = box.scrollHeight;
     var headers = { "Content-Type": "application/json" };
     if (tok()) headers.Authorization = "Bearer " + tok();
-    fetch("/api/vision", { method: "POST", headers: headers, body: JSON.stringify({ message: text || "මේ ගැන තව කියන්න", image: img }) })
+    fetch("/api/vision", { method: "POST", headers: headers, body: JSON.stringify({ message: text, image: img }) })
       .then(function (r) { return r.json(); })
       .then(function (d) {
         wait.textContent = d && d.reply ? d.reply : "⚠ " + ((d && d.error) || "fail");
@@ -228,18 +231,19 @@
       .catch(function () { wait.textContent = "⚠ ජාලය — නැවත උත්සාහ කරන්න"; });
   }
   function tryVisionSend(text) {
-    /* 1) අලුතින් attach කරපු පින්තූරයක් තියෙනවා නම් — ඒක යවනවා */
+    /* 1) අලුතින් attach කරපු පින්තූරයක් තියෙනවා නම් — text නැතුවත් යනවා (server default) */
     if (pendingImage) {
       var img = pendingImage; clearImage();
       sendVision(text, img);
       return true;
     }
-    /* 2) මතකයේ තියෙන පින්තූරයක් fresh නම් — follow-up එක ඒක එක්ක යනවා */
+    /* 2) මතකයේ පින්තූරයක් fresh නම් — text ඕනෑම follow-up එකක් ඒක එක්ක යනවා */
     if (ctxFresh()) {
+      if (!text) return false;
       sendVision(text, contextPhoto);
       return true;
     }
-    if (contextPhoto && !ctxFresh()) clearCtxChip(); /* කල් ඉකුත් වුණා නම් ඉවත් */
+    if (contextPhoto && !ctxFresh()) clearCtxChip();
     return false;
   }
   document.addEventListener("keydown", function (e) {
@@ -248,7 +252,7 @@
     if (!t || (t.tagName !== "TEXTAREA" && t.tagName !== "INPUT")) return;
     if (t.closest && t.closest("#pkDrawer,#pkMenu,#pkAccCard,#pkWake")) return;
     var text = (t.value || "").trim();
-    if (!text) return;
+    if (!text && !pendingImage) return;
     if (tryVisionSend(text)) { e.preventDefault(); e.stopPropagation(); }
   }, true);
   document.addEventListener("click", function (e) {
@@ -257,7 +261,7 @@
     if (!/යවන්න|send|அனுப்பு/i.test(b.textContent || b.value || "")) return;
     var inp = chatInput();
     var text = inp ? (inp.value || "").trim() : "";
-    if (!text) return;
+    if (!text && !pendingImage) return;
     if (tryVisionSend(text)) { e.preventDefault(); e.stopPropagation(); }
   }, true);
 
