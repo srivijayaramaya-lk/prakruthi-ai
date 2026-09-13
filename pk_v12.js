@@ -1,19 +1,21 @@
-/* ප්‍රකෘති AI v1.3 client — 📷 vision + photo memory + 👤 accounts + ☁ sync + 🪷 wake screen
+/* ප්‍රකෘති AI v1.3.1 client — 📷 vision + 🧠 photo memory + 🔊 voice + 👤 accounts + ☁ sync + 🪷 wake
    base: v1.2.2 (precise input selector + flex-aware camera) */
 (function () {
   "use strict";
   if (window.__pkV12) return;
   window.__pkV12 = true;
-  var K = { tok: "pk_token", user: "pk_user", sync: "pk_sync", last: "pk_last_sync" };
-  var pendingImage = null;      /* දැන් attach කරලා තියෙන අලුත් පින්තූරය */
-  var contextPhoto = null;      /* මතකයේ තියෙන පරණ පින්තූරය (follow-ups) */
+  var K = { tok: "pk_token", user: "pk_user", sync: "pk_sync", last: "pk_last_sync", voice: "pk_voice" };
+  var pendingImage = null;
+  var contextPhoto = null;
   var contextPhotoTs = 0;
-  var CTX_MS = 5 * 60 * 1000;   /* මතකයේ තියෙන කාලය: විනාඩි 5 */
+  var CTX_MS = 5 * 60 * 1000;
+  var siVoice = null;
 
   function $(id) { return document.getElementById(id); }
   function tok() { return localStorage.getItem(K.tok) || ""; }
   function me() { return localStorage.getItem(K.user) || ""; }
   function syncOn() { return localStorage.getItem(K.sync) !== "0"; }
+  function voiceOn() { return localStorage.getItem(K.voice) === "1"; }
   function toast(msg) {
     var t = $("pkToast"); if (!t) return;
     t.textContent = msg; t.style.display = "block";
@@ -94,6 +96,39 @@
     if (document.visibilityState === "visible") fetch("/api/pk_health", { cache: "no-store" }).catch(function () {});
   }, 9 * 60 * 1000);
 
+  /* ---------- 🔊 voice engine (v1.3.1) ---------- */
+  function pickVoice() {
+    if (!("speechSynthesis" in window)) return null;
+    var vs = speechSynthesis.getVoices();
+    for (var i = 0; i < vs.length; i++) {
+      if (/^si/i.test(vs[i].lang)) return vs[i];
+    }
+    return null;
+  }
+  function loadVoice() {
+    if (!("speechSynthesis" in window)) return;
+    siVoice = pickVoice();
+    if (!siVoice) {
+      speechSynthesis.onvoiceschanged = function () { siVoice = pickVoice(); };
+    }
+  }
+  function speak(text) {
+    if (!voiceOn() || !("speechSynthesis" in window) || !text) return;
+    try {
+      speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(text);
+      var v = siVoice || pickVoice();
+      if (v) u.voice = v;
+      u.lang = v ? v.lang : "si-LK";
+      u.rate = 1; u.pitch = 1;
+      speechSynthesis.speak(u);
+    } catch (e) {}
+  }
+  function stopSpeak() {
+    try { if ("speechSynthesis" in window) speechSynthesis.cancel(); } catch (e) {}
+  }
+  loadVoice();
+
   /* ---------- 📷 camera ---------- */
   function chatInput() {
     var list = document.querySelectorAll("textarea, input[type='text'], input:not([type])");
@@ -101,7 +136,7 @@
       var it = list[j];
       if (it.closest && it.closest("#pkDrawer,#pkMenu,#pkAccCard,#pkWake")) continue;
       var r = it.getBoundingClientRect ? it.getBoundingClientRect() : { width: 10, height: 10 };
-      if (r.width < 10 || r.height < 10) continue; /* hidden inputs skip */
+      if (r.width < 10 || r.height < 10) continue;
       return it;
     }
     return null;
@@ -143,7 +178,7 @@
     var chip = $("pkImgChip"); if (chip) chip.style.display = "none";
   }
 
-  /* ---------- 📷 photo memory (v1.3) ---------- */
+  /* ---------- 📷 photo memory ---------- */
   function ctxFresh() { return contextPhoto && (Date.now() - contextPhotoTs) < CTX_MS; }
   function showCtxChip() {
     var chip = $("pkCtxChip"); if (chip) chip.style.display = "flex";
@@ -173,7 +208,7 @@
         chip.querySelector("img").src = dataUrl;
         chip.querySelector("span").textContent = f.name || "photo";
         chip.style.display = "flex";
-        $("pkCtxChip").style.display = "none"; /* අලුත් එක attach — පරණ memory chip සැඟවෙනවා */
+        $("pkCtxChip").style.display = "none";
         var inp2 = chatInput();
         if (inp2 && !(inp2.value || "").trim()) inp2.value = "මේ මොකක්ද?";
         toast("පින්තූරය attach වුණා ✓ යවන්න");
@@ -207,7 +242,7 @@
     }
   }
 
-  /* ---------- 📷 send (අලුත් පින්තූරයක් හෝ මතකයේ එක) ---------- */
+  /* ---------- 📷 send ---------- */
   function sendVision(text, img) {
     var inp = chatInput();
     var box = chatBox(inp);
@@ -224,20 +259,19 @@
         wait.textContent = d && d.reply ? d.reply : "⚠ " + ((d && d.error) || "fail");
         box.scrollTop = box.scrollHeight;
         if (d && d.reply) {
-          contextPhoto = img; contextPhotoTs = Date.now(); /* මතකය අලුත් කරනවා */
+          contextPhoto = img; contextPhotoTs = Date.now();
           showCtxChip();
+          speak(d.reply);
         }
       })
       .catch(function () { wait.textContent = "⚠ ජාලය — නැවත උත්සාහ කරන්න"; });
   }
   function tryVisionSend(text) {
-    /* 1) අලුතින් attach කරපු පින්තූරයක් තියෙනවා නම් — text නැතුවත් යනවා (server default) */
     if (pendingImage) {
       var img = pendingImage; clearImage();
       sendVision(text, img);
       return true;
     }
-    /* 2) මතකයේ පින්තූරයක් fresh නම් — text ඕනෑම follow-up එකක් ඒක එක්ක යනවා */
     if (ctxFresh()) {
       if (!text) return false;
       sendVision(text, contextPhoto);
@@ -335,11 +369,47 @@
         if (sec) {
           sec.innerHTML = "<h5>Account ☁</h5>";
           var box = document.createElement("div"); box.id = "pkAccBox";
-          sec.appendChild(box); renderAcc(); return;
+          sec.appendChild(box); renderAcc(); addVoiceSec(); return;
         }
       }
     }
     setTimeout(upgradeMenu, 900);
+  }
+
+  /* ---------- 🔊 voice toggle (menu එකට) ---------- */
+  function addVoiceSec() {
+    var menu = $("pkMenu");
+    if (!menu || $("pkVoiceSec")) return;
+    var sec = document.createElement("div"); sec.className = "sec"; sec.id = "pkVoiceSec";
+    sec.appendChild(document.createElement("h5")).textContent = "Voice 🔊";
+    var row = document.createElement("div"); row.className = "row";
+    var s = document.createElement("span"); s.textContent = "පිළිතුරු හඬින් කියවන්න";
+    var chk = document.createElement("input"); chk.type = "checkbox"; chk.checked = voiceOn();
+    chk.onchange = function () {
+      localStorage.setItem(K.voice, chk.checked ? "1" : "0");
+      if (chk.checked) { loadVoice(); speak("හඬ සක්‍රීය වුණා"); }
+      else stopSpeak();
+    };
+    row.appendChild(s); row.appendChild(chk); sec.appendChild(row);
+    menu.appendChild(sec);
+  }
+
+  /* ---------- 🔊 main chat replies → voice ---------- */
+  function watchMainChat() {
+    var chat = document.getElementById("chat");
+    if (!chat) { setTimeout(watchMainChat, 800); return; }
+    new MutationObserver(function (muts) {
+      if (!voiceOn()) return;
+      for (var i = 0; i < muts.length; i++) {
+        var nodes = muts[i].addedNodes;
+        for (var j = 0; j < nodes.length; j++) {
+          var n = nodes[j];
+          if (n.nodeType === 1 && n.classList && n.classList.contains("msg") && n.classList.contains("ai")) {
+            speak(n.textContent);
+          }
+        }
+      }
+    }).observe(chat, { childList: true });
   }
 
   /* ---------- ☁ cloud sync ---------- */
@@ -386,6 +456,7 @@
   function init() {
     buildCamera();
     upgradeMenu();
+    watchMainChat();
     if (tok()) pullHistory();
     setInterval(function () { if (!$("pkCamBtn")) buildCamera(); }, 2000);
   }
