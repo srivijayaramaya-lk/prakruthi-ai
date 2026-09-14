@@ -63,6 +63,7 @@ SCHEMA = [
     "CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, pass TEXT NOT NULL, created INTEGER NOT NULL)",
     "CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY, user_id INTEGER NOT NULL, created INTEGER NOT NULL)",
     "CREATE TABLE IF NOT EXISTS history(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, role TEXT NOT NULL, text TEXT NOT NULL, ts INTEGER NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS contexts(user_id INTEGER PRIMARY KEY, data TEXT NOT NULL)",
 ]
 try:
     for s in SCHEMA:
@@ -228,6 +229,36 @@ async def vision(req: Request):
             last_err = model + " " + str(e)[:120]
             print("[pk] vision", last_err)
     return j({"error": "Vision fail — " + last_err}, 502)
+
+    # ---------- Context folders (cloud persist) ----------
+@pk_router.get("/api/contexts")
+async def ctx_get(req: Request):
+    t, u = current_user(req)
+    if not u:
+        return j({"error": "login වෙන්න"}, 401)
+    rows = db_exec("SELECT data FROM contexts WHERE user_id=? LIMIT 1", [int(u["id"])], rows=True)
+    if not rows:
+        return j({"ok": True, "data": []})
+    try:
+        import json as _json
+        return j({"ok": True, "data": _json.loads(rows[0]["data"])})
+    except Exception:
+        return j({"ok": True, "data": []})
+
+@pk_router.post("/api/contexts")
+async def ctx_save(req: Request):
+    t, u = current_user(req)
+    if not u:
+        return j({"ok": False}, 401)
+    b = await req.json()
+    data = b.get("data")
+    if not isinstance(data, list):
+        return j({"ok": False}, 400)
+    import json as _json
+    blob = _json.dumps(data)[:8000]
+    db_exec("DELETE FROM contexts WHERE user_id=?", [int(u["id"])])
+    db_exec("INSERT INTO contexts(user_id,data) VALUES(?,?)", [int(u["id"]), blob])
+    return j({"ok": True})
 
 # ---------- pk_v12.js serve ----------
 @pk_router.get("/pk_v12.js")

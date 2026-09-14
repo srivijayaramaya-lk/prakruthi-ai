@@ -1,10 +1,9 @@
-/* ප්‍රකෘති AI v1.3.1 client — 📷 vision + 🧠 photo memory + 🔊 voice + 👤 accounts + ☁ sync + 🪷 wake
-   base: v1.2.2 (precise input selector + flex-aware camera) */
+/* ප්‍රකෘති AI v1.3.2 — 📷 vision + 🧠 photo memory + 🔊 voice + 👤 accounts + 📌 context cloud + ☁ sync + 🪷 wake */
 (function () {
   "use strict";
   if (window.__pkV12) return;
   window.__pkV12 = true;
-  var K = { tok: "pk_token", user: "pk_user", sync: "pk_sync", last: "pk_last_sync", voice: "pk_voice" };
+  var K = { tok: "pk_token", user: "pk_user", sync: "pk_sync", last: "pk_last_sync", voice: "pk_voice", ctx: "pk_ctx" };
   var pendingImage = null;
   var contextPhoto = null;
   var contextPhotoTs = 0;
@@ -70,15 +69,13 @@
   ].join("");
   document.head.appendChild(st);
 
-  /* ---------- 🪷 wake screen + keep-alive ---------- */
+  /* ---------- 🪷 wake + keep-alive ---------- */
   var wake = document.createElement("div"); wake.id = "pkWake";
   wake.innerHTML = '<div class="card"><span class="lot">🪷</span>' +
     '<div class="t">ප්‍රකෘති අවදි වෙනවා…</div><div class="s">විනාඩියක් ඉන්න</div></div>';
   document.body.appendChild(wake);
   var wakeShown = 0;
-  function wakeShow() {
-    if (!wakeShown) { wakeShown = Date.now(); wake.style.display = "flex"; }
-  }
+  function wakeShow() { if (!wakeShown) { wakeShown = Date.now(); wake.style.display = "flex"; } }
   function wakeHide() { wake.style.display = "none"; }
   function wakeCheck(tries) {
     fetch("/api/pk_health", { cache: "no-store" })
@@ -96,21 +93,17 @@
     if (document.visibilityState === "visible") fetch("/api/pk_health", { cache: "no-store" }).catch(function () {});
   }, 9 * 60 * 1000);
 
-  /* ---------- 🔊 voice engine (v1.3.1) ---------- */
+  /* ---------- 🔊 voice ---------- */
   function pickVoice() {
     if (!("speechSynthesis" in window)) return null;
     var vs = speechSynthesis.getVoices();
-    for (var i = 0; i < vs.length; i++) {
-      if (/^si/i.test(vs[i].lang)) return vs[i];
-    }
+    for (var i = 0; i < vs.length; i++) { if (/^si/i.test(vs[i].lang)) return vs[i]; }
     return null;
   }
   function loadVoice() {
     if (!("speechSynthesis" in window)) return;
     siVoice = pickVoice();
-    if (!siVoice) {
-      speechSynthesis.onvoiceschanged = function () { siVoice = pickVoice(); };
-    }
+    if (!siVoice) speechSynthesis.onvoiceschanged = function () { siVoice = pickVoice(); };
   }
   function speak(text) {
     if (!voiceOn() || !("speechSynthesis" in window) || !text) return;
@@ -135,7 +128,7 @@
   }
   loadVoice();
 
-  /* ---------- 📷 camera ---------- */
+  /* ---------- 📷 camera + memory ---------- */
   function chatInput() {
     var list = document.querySelectorAll("textarea, input[type='text'], input:not([type])");
     for (var j = 0; j < list.length; j++) {
@@ -183,12 +176,8 @@
     pendingImage = null;
     var chip = $("pkImgChip"); if (chip) chip.style.display = "none";
   }
-
-  /* ---------- 📷 photo memory ---------- */
   function ctxFresh() { return contextPhoto && (Date.now() - contextPhotoTs) < CTX_MS; }
-  function showCtxChip() {
-    var chip = $("pkCtxChip"); if (chip) chip.style.display = "flex";
-  }
+  function showCtxChip() { var chip = $("pkCtxChip"); if (chip) chip.style.display = "flex"; }
   function clearCtxChip() {
     contextPhoto = null; contextPhotoTs = 0;
     var chip = $("pkCtxChip"); if (chip) chip.style.display = "none";
@@ -248,7 +237,6 @@
     }
   }
 
-  /* ---------- 📷 send ---------- */
   function sendVision(text, img) {
     var inp = chatInput();
     var box = chatBox(inp);
@@ -381,8 +369,6 @@
     }
     setTimeout(upgradeMenu, 900);
   }
-
-  /* ---------- 🔊 voice toggle (menu එකට) ---------- */
   function addVoiceSec() {
     var menu = $("pkMenu");
     if (!menu || $("pkVoiceSec")) return;
@@ -418,7 +404,29 @@
     }).observe(chat, { childList: true });
   }
 
-  /* ---------- ☁ cloud sync ---------- */
+  /* ---------- 📌 context folders — cloud persist (v1.3.2) ---------- */
+  function localCtx() {
+    try { return JSON.parse(localStorage.getItem(K.ctx) || "[]"); } catch (e) { return []; }
+  }
+  function saveLocalCtx(a) { localStorage.setItem(K.ctx, JSON.stringify(a)); }
+
+  function pullCtx() {
+    if (!tok()) return;
+    api("/api/contexts", {}, function (d) {
+      if (!d || !d.ok || !Array.isArray(d.data)) return;
+      if (d.data.length) {
+        saveLocalCtx(d.data);
+        toast("Context folders sync වුණා ☁");
+      }
+    });
+  }
+  function pushCtx(a) {
+    if (!tok()) return;
+    api("/api/contexts", { method: "POST", body: JSON.stringify({ data: a }) }, function (d) {
+      if (d && d.ok) toast("Folders cloud එකට save වුණා ☁");
+    });
+  }
+  /* pk_features එකේ Save button එකට hook — localStorage save වෙනවා අපිට පේනවා */
   var _si = Storage.prototype.setItem, _ri = Storage.prototype.removeItem;
   Storage.prototype.setItem = function (k, v) {
     _si.call(this, k, v);
@@ -431,14 +439,20 @@
           api("/api/history", { method: "POST", body: JSON.stringify(last) }, function () {});
         }
       }
+      if (k === "pk_ctx" && tok() && v) {   /* folder Save එකක් → cloud push */
+        var a = JSON.parse(v);
+        if (Array.isArray(a) && a.length) pushCtx(a);
+      }
     } catch (e) {}
   };
   Storage.prototype.removeItem = function (k) {
     _ri.call(this, k);
     if (k === "pk_history" && tok()) api("/api/history", { method: "DELETE" }, function () {});
   };
+
   function pullHistory() {
     if (!tok()) return;
+    pullCtx();
     api("/api/history", {}, function (d) {
       if (!d || !Array.isArray(d.items)) return;
       var local = [];
