@@ -2,7 +2,6 @@
 
 පහළ box එකේ **දකුණු උඩ corner එකේ copy button එක** තියෙනවා — ඒක click කරන්න (අතින් select කරන්න ඕන නෑ, වැරදෙන්නත් බෑ):
 
-```markdown
 # PK_STATE.md — ප්‍රකෘති AI Project State
 # Purpose: Any new AI session reads this file and continues the project seamlessly.
 # Last updated: 2026-09-14
@@ -128,7 +127,6 @@ verify via counts only (e.g. /api/knowledge_stats endpoint returning
 4. Current task: see section 7 and 8 — continue from there.
 5. After finishing work: update this file's "Last updated" date and
    roadmap, ask owner to commit.
-```
 
 
 11. Blocked / deferred features & WHY (do not attempt now)
