@@ -405,17 +405,12 @@
   }
 
   /* ---------- 📌 context folders — cloud persist (v1.3.2) ---------- */
-  function localCtx() {
-    try { return JSON.parse(localStorage.getItem(K.ctx) || "[]"); } catch (e) { return []; }
-  }
-  function saveLocalCtx(a) { localStorage.setItem(K.ctx, JSON.stringify(a)); }
-
   function pullCtx() {
     if (!tok()) return;
     api("/api/contexts", {}, function (d) {
       if (!d || !d.ok || !Array.isArray(d.data)) return;
       if (d.data.length) {
-        saveLocalCtx(d.data);
+        _si.call(localStorage, "pk_ctx", JSON.stringify(d.data));
         toast("Context folders sync වුණා ☁");
       }
     });
@@ -426,7 +421,8 @@
       if (d && d.ok) toast("Folders cloud එකට save වුණා ☁");
     });
   }
-  /* pk_features එකේ Save button එකට hook — localStorage save වෙනවා අපිට පේනවා */
+
+  /* ---------- ☁ cloud sync hooks ---------- */
   var _si = Storage.prototype.setItem, _ri = Storage.prototype.removeItem;
   Storage.prototype.setItem = function (k, v) {
     _si.call(this, k, v);
@@ -439,9 +435,9 @@
           api("/api/history", { method: "POST", body: JSON.stringify(last) }, function () {});
         }
       }
-      if (k === "pk_ctx" && tok() && v) {   /* folder Save එකක් → cloud push */
-        var a = JSON.parse(v);
-        if (Array.isArray(a) && a.length) pushCtx(a);
+      if (k === "pk_ctx" && tok() && v) {
+        var ca = JSON.parse(v);
+        if (Array.isArray(ca) && ca.length) pushCtx(ca);
       }
     } catch (e) {}
   };
