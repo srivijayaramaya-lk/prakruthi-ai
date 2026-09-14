@@ -116,7 +116,13 @@
     if (!voiceOn() || !("speechSynthesis" in window) || !text) return;
     try {
       speechSynthesis.cancel();
-      var u = new SpeechSynthesisUtterance(text);
+      var clean = (text || "")
+        .replace(/\*+/g, " ")
+        .replace(/[#_`~>|]+/g, " ")
+        .replace(/[\u2190-\u21FF\u2600-\u27BF\uFE0F]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      var u = new SpeechSynthesisUtterance(clean);
       var v = siVoice || pickVoice();
       if (v) u.voice = v;
       u.lang = v ? v.lang : "si-LK";
