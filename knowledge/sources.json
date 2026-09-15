@@ -1,0 +1,71 @@
+{
+  "_comment": "Prakruthi AI dhamma source registry - attribution & further study links",
+
+  "channels": [
+    {
+      "name": "කොස්වත්තේ අරියවිමල හිමි (official channel)",
+      "url": "http://www.youtube.com/@KoswatteAriyawimala"
+    },
+    {
+      "name": "දේවනන්ද හාමුදුරුවන් (channel)",
+      "url": ""
+    }
+  ],
+
+  "playlists": [
+    {
+      "name": "දේවනන්ද හාමුදුරුවන් — දේශනා ලැයිස්තුව",
+      "url": "https://www.youtube.com/playlist?list=PLELiWFtuVMLb9Zf8chd4lHeiAabT5yDIx"
+    }
+  ],
+
+  "books": [
+    {
+      "title": "සමස්ත සිතුවම",
+      "author": "කොස්වත්තේ අරියවිමල හිමි",
+      "url": "https://dhammadanabooks.com/wp-content/uploads/2022/06/Samasta-Situvama-Book-Final.pdf"
+    },
+    { "title": "ප්‍රඥාප්‍රදීපිකා", "author": "පරිව්‍රාජක ධම්මපාල හිමි", "url": "" },
+    { "title": "භාවවිවේක", "author": "", "url": "" },
+    { "title": "මූලමාධ්‍යමිකකාරිකා", "author": "", "url": "" },
+    { "title": "ස්වාතන්ත්‍රික සම්ප්‍රදාය", "author": "", "url": "" },
+    { "title": "අභිධර්මාර්ථ ප්‍රදීපිකා", "author": "", "url": "" }
+  ],
+
+  "videos_koswatte_ariyawimala": [
+    "https://www.youtube.com/watch?v=iQRGaZWvTjg",
+    "https://www.youtube.com/watch?v=wtz_1loKvKM",
+    "https://www.youtube.com/watch?v=zsXgxe2WL2o",
+    "https://www.youtube.com/watch?v=ayxprLbCJXM",
+    "https://www.youtube.com/watch?v=vvRaFpMMf8I",
+    "https://www.youtube.com/watch?v=BUiTlToRHvU",
+    "https://www.youtube.com/watch?v=EqHTamcVItI",
+    "https://www.youtube.com/watch?v=RQ0Bo3OmJW0",
+    "https://www.youtube.com/watch?v=pmzFbhRbuMs",
+    "https://www.youtube.com/watch?v=rzS8AX0q2ho",
+    "https://www.youtube.com/watch?v=nS9hnKpoldE",
+    "https://www.youtube.com/watch?v=xuK198ZZecs"
+  ],
+
+  "videos_devananda": [
+    "https://www.youtube.com/watch?v=iW6OeUJc_kI",
+    "https://www.youtube.com/watch?v=4D1WB554-9A",
+    "https://www.youtube.com/watch?v=x5eN70hrhmY",
+    "https://www.youtube.com/watch?v=hRXkqL9QsF4",
+    "https://www.youtube.com/watch?v=7q8Tvu2H6qE",
+    "https://www.youtube.com/watch?v=kk1KdQzRdBc",
+    "https://www.youtube.com/watch?v=Uij3CsykNow",
+    "https://www.youtube.com/watch?v=i4YBiNnOokE",
+    "https://www.youtube.com/watch?v=lb-jGaWz1Pk",
+    "https://www.youtube.com/watch?v=5z2LhMB7tHI",
+    "https://www.youtube.com/watch?v=KAoNrtySoX4",
+    "https://www.youtube.com/watch?v=ecBHrI1bFY0",
+    "https://www.youtube.com/watch?v=XC2BT--zzts",
+    "https://www.youtube.com/watch?v=11vcBmMIh9k",
+    "https://www.youtube.com/watch?v=PP6pUKvD-c0",
+    "https://www.youtube.com/watch?v=knSPe4K-xdw",
+    "https://www.youtube.com/watch?v=jouE0UMz-qU",
+    "https://www.youtube.com/watch?v=QPGcfVzA7hA",
+    "https://www.youtube.com/watch?v=xb6wyCH2Aks"
+  ]
+}
