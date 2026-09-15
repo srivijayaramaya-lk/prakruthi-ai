@@ -17,6 +17,7 @@ the owner in Sinhala, step-by-step, one small action at a time.
 - Keep-alive: cron-job.org pings /api/pk_health every 10 min
 - Test account: test_user / test123
 - Owner's phone: iPhone (Safari Add to Home Screen); friend's phone: Android (signed APK)
+- Knowledge counts: /api/knowledge_stats → {"wisdom":1000,"chapters":249,"sources":6}
 
 ## 3. Current stack & architecture
 - Backend: chat_server.py (FastAPI) + pk_api.py (all v1.2+ API routes)
@@ -55,38 +56,43 @@ Render → Manual Deploy → Deploy latest commit.
   prompt injection + attribution with links in replies (verified)
 - v1.5: level logic 1→4 — auto-detects user's dhamma level from the question
   (1 curiosity / 2 acceptance / 3 insight / 4 grounded action) and changes
-  answer style accordingly (verified: level-4 question gave practical steps)
+  answer style accordingly (verified)
 - v1.5.1: SILA lock fix — lock scans ONLY user words + history, never the
-  injected book text. Verified: dhamma Q with book quotes passes; English
-  "kill someone" still blocked (precept 1).
+  injected book text. Verified: dhamma Q passes; "kill someone" blocked.
 - v1.6: avatar-lite "ප්‍රකෘති මුහුණ" — floating live face top-center,
   breathing + blinking (verified visible, does not block UI)
-- v1.6.1: face reacts to chat — think (squinted eyes) while waiting for
-  reply, happy bounce when reply lands; leaf fully visible. Verified:
-  dhamma Q answered normally with avatar active, SILA clear.
+- v1.6.1: face reacts to chat — think while waiting, happy bounce on reply
+- v1.6.2: /api/knowledge_stats endpoint (count-only verification tool;
+  counts read wisdom_data.json / samasta_situvama.json / sources.json)
+- v1.6.3: counter recognizes "wisdom_items" key → stats now accurate
 - Keep-alive: /api/pk_health returns {"ok":true,"db":true}
 
-## 7. Knowledge base status (engine DONE — data partially pending)
-- Engine: shipped & verified (v1.4). Attribution mandatory: book title +
-  author monk + chapter; AI never claims authorship of dhamma.
-- Sources: wisdom_items (~1000, owner-compiled from දේවනන්ද හාමුදුරුවන්
-  sermons + "සමස්ත සිතුවම" by කොස්වත්තේ අරියවිමල හාමුදුරුවන්),
-  "ප්‍රඥාප්‍රදීපිකා" chapters (පරිව්‍රාජක ධම්මපාල හිමි).
-- Data still pending: wisdom_items 942–1000; remaining book chapters.
-  Future books: භාවවිවේක, මූලමාධ්‍යමිකකාරිකා, ස්වාතන්ත්‍රික සම්ප්‍රදාය,
-  අභිධර්මාර්ථ ප්‍රදීපිකා. Tibetan/Chinese translations: future registry only.
+## 7. Knowledge base — COMPLETE ✅ (verified 2026-09-15)
+- /api/knowledge_stats → {"wisdom":1000,"chapters":249,"sources":6}
+- wisdom_data.json: {"wisdom_items":[...]} — owner-compiled items 1–1000
+  (from දේවනන්ද හාමුදුරුවන් sermons + "සමස්ත සිතුවම" by
+  කොස්වත්තේ අරියවිමල හාමුදුරුවන්). Format: {"id","topic","reflection"}
+- samasta_situvama.json: 249 passages, format {"id","title","content",
+  "keywords"} (ids are strings, unordered — fine, search is keyword-based)
+- sources.json: registry, 6 entries
+- Attribution mandatory: book title + author monk + chapter; AI never
+  claims authorship of dhamma.
+- Future books (owner will provide files later): භාවවිවේක,
+  මූලමාධ්‍යමිකකාරිකා, ස්වාතන්ත්‍රික සම්ප්‍රදාය, අභිධර්මාර්ථ ප්‍රදීපිකා.
+  Tibetan/Chinese translations: future registry only.
 - DATA RULE: NEVER accept large data pastes in chat. Owner copies files
   directly into knowledge/ via VS Code/Explorer → commit → Sync. Verify via
-  counts only (/api/knowledge_stats).
+  /api/knowledge_stats counts only.
 
 ## 8. Roadmap (next work, in order)
 1. ✅ DONE v1.4: knowledge base + injection + attribution
 2. ✅ DONE v1.5 + v1.5.1: level logic 1→4 + lock fix
-3. ✅ DONE v1.6 + v1.6.1: avatar-lite "ප්‍රකෘති මුහුණ" (pk_avatar.js)
-4. NEXT: finish knowledge data — owner moves remaining files into
-   knowledge/ (wisdom_items 942–1000 + pending chapters) via repo,
-   verify with /api/knowledge_stats counts
-5. Tier 3 (later): Rive 3D avatar, offline mode
+3. ✅ DONE v1.6 + v1.6.1: avatar-lite "ප්‍රකෘති මුහුණ"
+4. ✅ DONE: knowledge data — wisdom 1000 + chapters 249 + sources 6 verified
+5. NEXT: decide with owner — options: (a) future books data when provided,
+   (b) Tier 3 Rive 3D avatar, (c) public-launch prep (rotate Turso token,
+   README, etc.)
+6. Tier 3 (later): Rive 3D avatar, offline mode
 
 ## 9. Gotchas / lessons learned (do not repeat)
 - NEVER paste large data (>50KB) into chat — chats die mid-session. Move
@@ -95,6 +101,9 @@ Render → Manual Deploy → Deploy latest commit.
   text — book quotes contain sensitive-looking words; v1.5.1 fixed this.
 - Avatar js must be self-contained (own CSS injection, own fetch wrapper) —
   never edit CHAT_HTML or other js files for UI add-ons.
+- When writing a count/verify endpoint, first check the REAL key names in
+  the data files (wisdom_data.json uses "wisdom_items" — generic guesses
+  like "items" return wrong counts).
 - Render free tier sleeps after 15 min → PWABuilder can false-fail
   "manifest missing" → wake app first, re-run.
 - Find&Replace: use per-file Ctrl+H only, never Ctrl+Shift+H across all
@@ -116,7 +125,7 @@ Render → Manual Deploy → Deploy latest commit.
    instructions at once.
 3. Never put secrets in repo or chat. Turso token was exposed once and
    rotated — remind to rotate again before public launch.
-4. Current task: see section 8 — item 4 (knowledge data) is next.
+4. Current task: see section 8 — item 5 (decide next direction with owner).
 5. After finishing work: update this file's "Last updated" date and
    roadmap, ask owner to commit.
 
