@@ -4,7 +4,7 @@
 
 # PK_STATE.md — ප්‍රකෘති AI Project State
 # Purpose: Any new AI session reads this file and continues the project seamlessly.
-# Last updated: 2026-09-14
+# Last updated: 2026-09-15
 
 ## 1. What is this project?
 "ප්‍රකෘති AI" (Prakruthi AI) — a Sinhala-first AI chat web app + Android APK,
@@ -49,6 +49,10 @@ Render → Manual Deploy → Deploy latest commit.
 - v1.3: photo memory (5-min follow-up questions reuse photo)
 - v1.3.1: voice output (TTS toggle, markdown/emoji stripped)
 - v1.3.2: context folders (3 slots) cloud-persisted (GET/POST /api/contexts)
+
+- v1.4: dhamma knowledge engine — knowledge/ data + search +
+  prompt injection + attribution with links in replies (verified)
+  
 - Keep-alive: /api/pk_health returns {"ok":true,"db":true}
 
 ## 7. CURRENT WORK — Dhamma Knowledge Base (Tier 2-C) — IN PROGRESS
@@ -93,11 +97,11 @@ verify via counts only (e.g. /api/knowledge_stats endpoint returning
 {"wisdom": 1000, "chapters": 23}).
 
 ## 8. Roadmap (next work, in order)
-1. Owner creates knowledge/ folder + copies data files into it (owner does
-   file moves, AI writes code).
-2. AI writes server code: knowledge loader + search + prompt injection.
-3. Test: ask a dhamma question → answer cites සමස්ත සිතුවම / ප්‍රඥාප්‍රදීපිකා.
-4. Level logic 1→4 on top of knowledge base.
+1. ✅ DONE v1.4: knowledge base + injection + attribution
+2. Level logic 1→4 on top of knowledge base
+3. Avatar-lite "ප්‍රකෘති මුහුණ" (Tier 2.5, pk_avatar.js)
+4. Tier 3 (later): Rive 3D avatar, offline mode
+
 5. Tier 3 (later): avatar/video UI (Rive), offline mode (blocked until
    Sinhala-capable on-device models exist).
 
