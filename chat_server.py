@@ -97,30 +97,44 @@ def chat_pipeline(prompt, client_id="default"):
     online = gemini.online()
     whisper_note = None
     if online:
-        ucontent = prompt
-        if APPAMADA_DATA.get("dharma_whisper", True):
+         ucontent = prompt
+            # v1.4 dhamma knowledge injection (Tier 2-C)
+    try:
+                import pk_knowledge as pk_kb
+                if not getattr(pk_kb, "_loaded", False):
+                    pk_kb.kb_load()
+                    pk_kb._loaded = True
+                _kbctx = pk_kb.kb_context(prompt)
+                if _kbctx:
+                    ucontent += "\n\n" + _kbctx
+                    print("[pk-kb] injected:", prompt[:40])
+    except Exception as _kbe:
+                print("[pk-kb] inject fail:", str(_kbe)[:80])
+
+        
+    if APPAMADA_DATA.get("dharma_whisper", True):
             ucontent += ("\n\n(Also: at the very end of your reply, on its own last line, "
                          "add '🪷' followed by one short Buddhist teaching — max 2 "
                          "sentences — fitting this exact question/moment, in the "
                          "user's language.)")
-        messages = ([{"role": "system", "content": SYSTEM_PROMPT}]
+    messages = ([{"role": "system", "content": SYSTEM_PROMPT}]
                     + history[-MAX_HISTORY * 2:]
                     + [{"role": "user", "content": ucontent}])
-        violation = check_messages(messages)
-        if violation:
+    violation = check_messages(messages)
+    if violation:
             audit({"event": "BLOCK", "layer": "lock", "input": prompt,
                    "precept": violation, "src": "chat"})
             return {"success": False, "output": refusal(violation),
                     "gate": {"precept": violation, "lang": lang}, "note": None}
-        try:
+    try:
             out = llm_chat(messages)
-        except Exception as e:
+    except Exception as e:
             audit({"event": "LLM_ERROR", "error": repr(e), "input": prompt, "src": "chat"})
             return {"success": False, "output": LLM_DOWN.get(lang, LLM_DOWN["en"]),
                     "gate": {"precept": None, "lang": lang, "note_flag": "llm_down"}, "note": None}
         # whisper line එක පැත්තට කැපීම
-        lines_ = out.strip().splitlines()
-        if lines_ and lines_[-1].lstrip().startswith("🪷"):
+    lines_ = out.strip().splitlines()
+    if lines_ and lines_[-1].lstrip().startswith("🪷"):
             wtext = lines_[-1].strip()
             out = "\n".join(lines_[:-1]).strip()
             whisper_note = {"text": wtext, "kind": "dharma"}
