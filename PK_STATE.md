@@ -1,7 +1,3 @@
-✅ **නියමයි!** PK_STATE.md හැදිලා තියෙනවා (Explorer එකේ පේනවා, හිස් file එකක්). දැන් මේ content එක දෙන්නම් — මම කලින් version එක **අලුත් දැනුමෙන් update කරලා** තියෙනවා (හාමුදුරුවන්ගේ පොත, data progress, අලුත් නීති).
-
-පහළ box එකේ **දකුණු උඩ corner එකේ copy button එක** තියෙනවා — ඒක click කරන්න (අතින් select කරන්න ඕන නෑ, වැරදෙන්නත් බෑ):
-
 # PK_STATE.md — ප්‍රකෘති AI Project State
 # Purpose: Any new AI session reads this file and continues the project seamlessly.
 # Last updated: 2026-09-15
@@ -24,6 +20,8 @@ the owner in Sinhala, step-by-step, one small action at a time.
 
 ## 3. Current stack & architecture
 - Backend: chat_server.py (FastAPI) + pk_api.py (all v1.2+ API routes)
+- Knowledge engine: pk_knowledge.py (v1.4+) — loads knowledge/ at startup,
+  kb_search / kb_context, prompt injection, attribution, LEVEL LOGIC (v1.5)
 - DB tables (Turso): users, sessions, history, contexts
 - AI: Gemini API (GEMINI_API_KEY env) — chat via sila/ engine chain,
   vision via /api/vision with model fallback list
@@ -49,62 +47,41 @@ Render → Manual Deploy → Deploy latest commit.
 - v1.3: photo memory (5-min follow-up questions reuse photo)
 - v1.3.1: voice output (TTS toggle, markdown/emoji stripped)
 - v1.3.2: context folders (3 slots) cloud-persisted (GET/POST /api/contexts)
-
 - v1.4: dhamma knowledge engine — knowledge/ data + search +
   prompt injection + attribution with links in replies (verified)
-  
+- v1.5: level logic 1→4 — auto-detects user's dhamma level from the question
+  (1 curiosity / 2 acceptance / 3 insight / 4 grounded action) and changes
+  answer style accordingly (verified: level-4 question gave practical steps)
+- v1.5.1: SILA lock fix — lock scans ONLY user words + history, never the
+  injected book text. Verified: dhamma Q with book quotes passes; English
+  "kill someone" still blocked (precept 1).
 - Keep-alive: /api/pk_health returns {"ok":true,"db":true}
 
-## 7. CURRENT WORK — Dhamma Knowledge Base (Tier 2-C) — IN PROGRESS
-Goal: Prakruthi AI answers dhamma questions using the OWNER'S OWN content,
-not generic Gemini knowledge.
-
-### 7a. Data sources & ATTRIBUTION (respectful, mandatory):
-- wisdom_items (~1000): compiled by the OWNER from
-  (1) YouTube sermons of දේවනන්ද හාමුදුරුවන් and
-  (2) the book "සමස්ත සිතුවම" by කොස්වත්තේ අරියවිමල හාමුදුරුවන්.
-  Format: {"id", "topic", "reflection"}. Items 1-941 delivered via old chat
-  (lost with chat history — see 7c for recovery). Items 942-1000 pending.
-- Book chapters: "ප්‍රඥාප්‍රදීපිකා" (පරිව්‍රාජක ධම්මපාල හිමි) —
-  format: {"id", "title", "content", "keywords"}, 23 chapters, parts pending.
-- Future books (owner will provide files): භාවවිවේක, මූලමාධ්‍යමිකකාරිකා,
-  ස්වාතන්ත්‍රික සම්ප්‍රදාය, අභිධර්මාර්ථ ප්‍රදීපිකා.
-  All books teach the same core Buddha-dhamma (owner's view: same teaching,
-  different analytical depth). Tibetan/Chinese translations: noted for
-  future registry, not required now.
-- AI replies MUST cite: book title + author monk's name + chapter.
-  AI never claims authorship of dhamma.
-
-### 7b. Planned structure:
-knowledge/
-  books.json        (registry: title, author, description)
-  wisdom_items.json (~1000 quotes)
-  chapters/         (per-book chapter JSON files)
-Server loads at startup; search matches user question → keywords/topic;
-matched passages injected into Gemini prompt as "owner's teacher's words";
-SILA safety chain stays ON TOP unchanged.
-Plan levels 1→4 (discovery, acceptance, insight, grounded action) AFTER
-knowledge base works.
-
-### 7c. DATA RECOVERY — IMPORTANT:
-Owner pasted wisdom_items 1-941 (4 parts) + chapter samples into a previous
-chat (z.ai) which then blocked/died. Content is LOST from chat but the
-owner still HAS the source files on his PC (Philos project + pastes).
-Rule discovered: NEVER accept large data pastes in chat again.
-Instead: owner copies files directly in VS Code / Windows Explorer into
-knowledge/ folder → commit → Sync. AI never needs to see full content —
-verify via counts only (e.g. /api/knowledge_stats endpoint returning
-{"wisdom": 1000, "chapters": 23}).
+## 7. Knowledge base status (engine DONE — data partially pending)
+- Engine: shipped & verified (v1.4). Attribution mandatory: book title +
+  author monk + chapter; AI never claims authorship of dhamma.
+- Sources: wisdom_items (~1000, owner-compiled from දේවනන්ද හාමුදුරුවන්
+  sermons + "සමස්ත සිතුවම" by කොස්වත්තේ අරියවිමල හාමුදුරුවන්),
+  "ප්‍රඥාප්‍රදීපිකා" chapters (පරිව්‍රාජක ධම්මපාල හිමි).
+- Data still pending: wisdom_items 942–1000; remaining book chapters.
+  Future books: භාවවිවේක, මූලමාධ්‍යමිකකාරිකා, ස්වාතන්ත්‍රික සම්ප්‍රදාය,
+  අභිධර්මාර්ථ ප්‍රදීපිකා. Tibetan/Chinese translations: future registry only.
+- DATA RULE: NEVER accept large data pastes in chat. Owner copies files
+  directly into knowledge/ via VS Code/Explorer → commit → Sync. Verify via
+  counts only (/api/knowledge_stats).
 
 ## 8. Roadmap (next work, in order)
 1. ✅ DONE v1.4: knowledge base + injection + attribution
-2. Level logic 1→4 on top of knowledge base
-3. Avatar-lite "ප්‍රකෘති මුහුණ" (Tier 2.5, pk_avatar.js)
+2. ✅ DONE v1.5 + v1.5.1: level logic 1→4 + lock fix
+3. ⏭ NEXT: Avatar-lite "ප්‍රකෘති මුහුණ" (Tier 2.5, pk_avatar.js —
+   blinking + breathing live face, pure CSS/JS)
 4. Tier 3 (later): Rive 3D avatar, offline mode
 
 ## 9. Gotchas / lessons learned (do not repeat)
 - NEVER paste large data (>50KB) into chat — chats die mid-session. Move
-  files via repo instead (see 7c).
+  files via repo instead (see section 7).
+- SILA lock must scan ONLY user input (+ history), NEVER injected knowledge
+  text — book quotes contain sensitive-looking words; v1.5.1 fixed this.
 - Render free tier sleeps after 15 min → PWABuilder can false-fail
   "manifest missing" → wake app first, re-run.
 - Find&Replace: use per-file Ctrl+H only, never Ctrl+Shift+H across all
@@ -117,6 +94,7 @@ verify via counts only (e.g. /api/knowledge_stats endpoint returning
 - Function names: /manifest (SILA) vs /manifest.json (PWA) — keep distinct.
 - git: commit → Sync; discard changes for un-committed mistakes; Render
   Rollback for deployed mistakes.
+- debug_l1.py: dev debug script (harmless — can stay or delete later).
 
 ## 10. How to continue in a NEW chat session (instructions for the AI)
 1. Read this file fully. You now know the project.
@@ -125,18 +103,26 @@ verify via counts only (e.g. /api/knowledge_stats endpoint returning
    instructions at once.
 3. Never put secrets in repo or chat. Turso token was exposed once and
    rotated — remind to rotate again before public launch.
-4. Current task: see section 7 and 8 — continue from there.
+4. Current task: see section 8 — item 3 (Avatar-lite) is next.
 5. After finishing work: update this file's "Last updated" date and
    roadmap, ask owner to commit.
 
+## 11. Blocked / deferred features & WHY (do not attempt now)
+- Offline on-device AI (Gemma / Gemini Nano): models are 2-4GB, flagship
+  phones only, and Sinhala quality in small models is very poor — fatal
+  flaw for a Sinhala-first app. Revisit ONLY when Sinhala-capable small
+  models exist.
+- Offline Sinhala TTS: no good offline Sinhala voice exists (even Google
+  TTS has no Sinhala). Current voice output uses online speechSynthesis.
+- ML Kit on-device translation: Sinhala is NOT in its supported list.
+- Flutter rewrite: NOT planned. Working app exists — never rewrite working
+  software from scratch. Improve it instead.
+- Rive avatar / lip-sync: possible but a big separate project — Tier 3.
+- Architecture note: server engine chain is designed so a future on-device
+  engine could replace cloud AI without changing the rest of the app.
 
-11. Blocked / deferred features & WHY (do not attempt now)
-Offline on-device AI (Gemma / Gemini Nano): models are 2-4GB, flagshipphones only, and Sinhala quality in small models is very poor — fatalflaw for a Sinhala-first app. Revisit ONLY when Sinhala-capable smallmodels exist.
-Offline Sinhala TTS: no good offline Sinhala voice exists (even GoogleTTS has no Sinhala). Current voice output uses online speechSynthesis.
-ML Kit on-device translation: Sinhala is NOT in its supported list.
-Flutter rewrite: NOT planned. Working app exists — never rewrite workingsoftware from scratch. Improve it instead.
-Rive avatar / lip-sync: possible but a big separate project — Tier 3.
-Architecture note: server engine chain is designed so a future on-deviceengine could replace cloud AI without changing the rest of the app.
-12. Recovery message (for a NEW chat when blocked)
-"මම ප්‍රකෘති AI project එකක් හදනවා. Project state file එක මෙතන:https://github.com/srivijayaramaya-lk/prakruthi-ai/blob/main/PK_STATE.mdමේක කියවලා, section 8 roadmap එකේ ඊළඟ පියවරෙන් දිගටම කරන්න.මට සිංහලෙන්, පියවරෙන් පියවර කියන්න."
-
+## 12. Recovery message (for a NEW chat when blocked)
+"මම ප්‍රකෘති AI project එකක් හදනවා. Project state file එක මෙතන:
+https://github.com/srivijayaramaya-lk/prakruthi-ai/blob/main/PK_STATE.md
+මේක කියවලා, section 8 roadmap එකේ ඊළඟ පියවරෙන් දිගටම කරන්න.
+මට සිංහලෙන්, පියවරෙන් පියවර කියන්න."
