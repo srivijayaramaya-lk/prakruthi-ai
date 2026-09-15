@@ -406,7 +406,7 @@ def api_knowledge_stats():
         if isinstance(d, list):
             return len(d)
         if isinstance(d, dict):
-            for k in ("items", "wisdom", "chapters", "data", "records"):
+            for k in ("wisdom_items", "items", "wisdom", "chapters", "data", "records"):
                 if isinstance(d.get(k), list):
                     return len(d[k])
             return len(d)
