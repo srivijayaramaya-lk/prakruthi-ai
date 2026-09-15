@@ -393,6 +393,30 @@ def pk_features_js():
 def pk_avatar_js():
     return FileResponse("pk_avatar.js", media_type="application/javascript")
 
+
+@app.get("/api/knowledge_stats")
+def api_knowledge_stats():
+    import json
+    def count(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                d = json.load(f)
+        except Exception:
+            return 0
+        if isinstance(d, list):
+            return len(d)
+        if isinstance(d, dict):
+            for k in ("items", "wisdom", "chapters", "data", "records"):
+                if isinstance(d.get(k), list):
+                    return len(d[k])
+            return len(d)
+        return 0
+    return {
+        "wisdom": count("knowledge/wisdom_data.json"),
+        "chapters": count("knowledge/samasta_situvama.json"),
+        "sources": count("knowledge/sources.json"),
+    }
+
 # ---------- v1.2 PWA (manifest + sw + icons) ----------
 from fastapi.responses import FileResponse as _FR
 
