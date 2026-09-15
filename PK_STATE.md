@@ -22,12 +22,16 @@ the owner in Sinhala, step-by-step, one small action at a time.
 - Backend: chat_server.py (FastAPI) + pk_api.py (all v1.2+ API routes)
 - Knowledge engine: pk_knowledge.py (v1.4+) — loads knowledge/ at startup,
   kb_search / kb_context, prompt injection, attribution, LEVEL LOGIC (v1.5)
+- Avatar: pk_avatar.js (v1.6+) — pure CSS/JS live face "ප්‍රකෘති මුහුණ":
+  breathing + random blinking + think state while /chat in flight +
+  happy bounce when reply lands. Served via @app.get("/pk_avatar.js")
+  route in chat_server.py + <script> tag after pk_v12.js. Self-contained
+  fetch wrapper — modifies NO other file. window.PKAvatar.set('idle'|'think')
 - DB tables (Turso): users, sessions, history, contexts
 - AI: Gemini API (GEMINI_API_KEY env) — chat via sila/ engine chain,
   vision via /api/vision with model fallback list
 - Frontend: CHAT_HTML inline in chat_server.py + pk_features.js (UI pack)
-  + pk_v12.js (v1.3.2 client: vision, photo memory, TTS, account sync,
-  context cloud sync, wake screen, keep-alive pings)
+  + pk_v12.js (v1.3.2 client) + pk_avatar.js (v1.6 face)
 - PWA: manifest.json, sw.js, icon-192.png, icon-512.png
 - Android: PWABuilder TWA, signed, package id com.onrender.prakruthi_ai.twa;
   assetlinks.json served at /.well-known/assetlinks.json
@@ -55,6 +59,11 @@ Render → Manual Deploy → Deploy latest commit.
 - v1.5.1: SILA lock fix — lock scans ONLY user words + history, never the
   injected book text. Verified: dhamma Q with book quotes passes; English
   "kill someone" still blocked (precept 1).
+- v1.6: avatar-lite "ප්‍රකෘති මුහුණ" — floating live face top-center,
+  breathing + blinking (verified visible, does not block UI)
+- v1.6.1: face reacts to chat — think (squinted eyes) while waiting for
+  reply, happy bounce when reply lands; leaf fully visible. Verified:
+  dhamma Q answered normally with avatar active, SILA clear.
 - Keep-alive: /api/pk_health returns {"ok":true,"db":true}
 
 ## 7. Knowledge base status (engine DONE — data partially pending)
@@ -73,15 +82,19 @@ Render → Manual Deploy → Deploy latest commit.
 ## 8. Roadmap (next work, in order)
 1. ✅ DONE v1.4: knowledge base + injection + attribution
 2. ✅ DONE v1.5 + v1.5.1: level logic 1→4 + lock fix
-3. ⏭ NEXT: Avatar-lite "ප්‍රකෘති මුහුණ" (Tier 2.5, pk_avatar.js —
-   blinking + breathing live face, pure CSS/JS)
-4. Tier 3 (later): Rive 3D avatar, offline mode
+3. ✅ DONE v1.6 + v1.6.1: avatar-lite "ප්‍රකෘති මුහුණ" (pk_avatar.js)
+4. NEXT: finish knowledge data — owner moves remaining files into
+   knowledge/ (wisdom_items 942–1000 + pending chapters) via repo,
+   verify with /api/knowledge_stats counts
+5. Tier 3 (later): Rive 3D avatar, offline mode
 
 ## 9. Gotchas / lessons learned (do not repeat)
 - NEVER paste large data (>50KB) into chat — chats die mid-session. Move
   files via repo instead (see section 7).
 - SILA lock must scan ONLY user input (+ history), NEVER injected knowledge
   text — book quotes contain sensitive-looking words; v1.5.1 fixed this.
+- Avatar js must be self-contained (own CSS injection, own fetch wrapper) —
+  never edit CHAT_HTML or other js files for UI add-ons.
 - Render free tier sleeps after 15 min → PWABuilder can false-fail
   "manifest missing" → wake app first, re-run.
 - Find&Replace: use per-file Ctrl+H only, never Ctrl+Shift+H across all
@@ -90,7 +103,7 @@ Render → Manual Deploy → Deploy latest commit.
   go in <head> only.
 - Chat input selector: "textarea, input[type='text'], input:not([type])"
   (plain "input" catches hidden file inputs).
-- Browser caches pk_v12.js → Ctrl+Shift+R after deploys.
+- Browser caches pk_v12.js / pk_avatar.js → Ctrl+Shift+R after deploys.
 - Function names: /manifest (SILA) vs /manifest.json (PWA) — keep distinct.
 - git: commit → Sync; discard changes for un-committed mistakes; Render
   Rollback for deployed mistakes.
@@ -103,7 +116,7 @@ Render → Manual Deploy → Deploy latest commit.
    instructions at once.
 3. Never put secrets in repo or chat. Turso token was exposed once and
    rotated — remind to rotate again before public launch.
-4. Current task: see section 8 — item 3 (Avatar-lite) is next.
+4. Current task: see section 8 — item 4 (knowledge data) is next.
 5. After finishing work: update this file's "Last updated" date and
    roadmap, ask owner to commit.
 
