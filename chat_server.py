@@ -120,7 +120,7 @@ def chat_pipeline(prompt, client_id="default"):
     messages = ([{"role": "system", "content": SYSTEM_PROMPT}]
                     + history[-MAX_HISTORY * 2:]
                     + [{"role": "user", "content": ucontent}])
-    violation = check_messages(messages)
+    violation = check_messages(history + [{"role": "user", "content": prompt}])
     if violation:
             audit({"event": "BLOCK", "layer": "lock", "input": prompt,
                    "precept": violation, "src": "chat"})
