@@ -378,6 +378,7 @@ if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").cat
 </script>
 <script src="/pk_features.js"></script>
 <script src="/pk_v12.js"></script>
+<script src="/pk_avatar.js"></script>
 </body>
 </html>"""
 
@@ -387,6 +388,10 @@ from fastapi.responses import FileResponse
 @app.get("/pk_features.js")
 def pk_features_js():
     return FileResponse("pk_features.js", media_type="application/javascript")
+
+@app.get("/pk_avatar.js")
+def pk_avatar_js():
+    return FileResponse("pk_avatar.js", media_type="application/javascript")
 
 # ---------- v1.2 PWA (manifest + sw + icons) ----------
 from fastapi.responses import FileResponse as _FR
