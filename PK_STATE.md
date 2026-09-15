@@ -102,9 +102,6 @@ verify via counts only (e.g. /api/knowledge_stats endpoint returning
 3. Avatar-lite "ප්‍රකෘති මුහුණ" (Tier 2.5, pk_avatar.js)
 4. Tier 3 (later): Rive 3D avatar, offline mode
 
-5. Tier 3 (later): avatar/video UI (Rive), offline mode (blocked until
-   Sinhala-capable on-device models exist).
-
 ## 9. Gotchas / lessons learned (do not repeat)
 - NEVER paste large data (>50KB) into chat — chats die mid-session. Move
   files via repo instead (see 7c).
