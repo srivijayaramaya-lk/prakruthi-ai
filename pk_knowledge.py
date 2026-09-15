@@ -124,7 +124,22 @@ def kb_context(query, max_chars=4500):
     q_low = (query or "").lower()
     dhamma = bool(wis or chs) or any(w in q_low for w in _DHAMMA_WORDS)
     if not dhamma:
-        return ""
+        import urllib.parse
+        topic = " ".join((query or "").split())[:80]
+        if not topic:
+            return ""
+        yt = "https://www.youtube.com/results?search_query=" + urllib.parse.quote(topic)
+        wp = "https://si.wikipedia.org/wiki/Special:Search?search=" + urllib.parse.quote(topic)
+        return (
+            "【වැඩිදුර කියවීම් නීතිය】\n"
+            "මේ ප්‍රශ්නය තොරතුරු/දැනුම සොයන එකක් නම්, උත්තරේ අවසානයේ "
+            "'වැඩිදුර කියවීමට' කොටසක් ලෙස පහත links දෙකම දෙන්න. "
+            "මේ නිශ්චිත URLs ම පාවිච්චි කරන්න — අලුත් URL හදන්නේ නැත. "
+            "සුහද හරියවස් කතාවක් නම් (උදා: ආයුබෝවන්න, ඔයා කවුද) links දෙන්න එපා:\n"
+            f"▶️ YouTube: {yt}\n"
+            f"📖 විකිපීඩියා: {wp}"
+        )
+    
     parts = [
         "පහත දැක්වෙන්නේ මෙම app එකේ අයිතිකරුගේ ගුරු හිමිවරුන්ගේ "
         "(කොස්වත්තේ අරියවිමල හිමි, දේවනන්ද හාමුදුරුවන්, "
