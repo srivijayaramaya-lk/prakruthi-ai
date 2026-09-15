@@ -1,10 +1,42 @@
-# pk_knowledge.py — Dhamma Knowledge Engine (Tier 2-C)
-# Loads knowledge/*.json, searches user questions, builds
-# attributed context for the Gemini prompt. v1.4.0
+# pk_knowledge.py — Dhamma Knowledge Engine + Level Logic 1→4
+# Loads knowledge/*.json, searches user questions, detects the dhamma
+# journey level (owner's 1→4 philosophy), builds an attributed context
+# block for the Gemini prompt. v1.5.0
 
 import json, os, re
 
 _KB = {"wisdom": [], "chapters": [], "sources": {}}
+
+# ---------- dhamma journey levels (owner's philosophy) ----------
+# 1 discovery · 2 acceptance · 3 insight · 4 grounded action
+LEVEL_GUIDE = {
+    1: "මෙම user දැන් ධර්ම ගමනේ 1 වන මට්ටමේ (කුතුහලය — සොයාගැනීම) සිටියි. "
+       "උත්තරය කෙටි හා සරල කරන්න. එක පැහැදිලි අදහසක් පමණයි. "
+       "පාලි වචන වැඩියෙන් එපා. අවසානයේ කුතුහලය අවදි කරන මෘදු ප්‍රශ්නයක් අහන්න.",
+    2: "මෙම user ධර්ම ගමනේ 2 වන මට්ටමේ (පිළිගැනීම) සිටියි. "
+       "හේතු පැහැදිලිව පෙන්වන්න, ඉගැන්වීම් එකිනෙක සම්බන්ධ කරන්න, "
+       "විශ්වාසය තහවුරු කරන ආකාරයට උත්තර දෙන්න.",
+    3: "මෙම user ධර්ම ගමනේ 3 වන මට්ටමේ (ඔප්පුව — අවබෝධය) සිටියි. "
+       "ගැඹුරට උත්තර දෙන්න. තමන්ගේම අත්දැකීම දිහා බලන්න යොමු කරන්න "
+       "(අනිත්‍ය / අනාත්ම ඇසින්). අවසානයේ ගැඹුරු සිතුවිල්ලක් අවදි කරන්න.",
+    4: "මෙම user ධර්ම ගමනේ 4 වන මට්ටමේ (පියවර — ජීවිතයට ගැනීම) සිටියි. "
+       "කෙටි හා ප්‍රායෝගික වන්න. අදම කරන්න පුළුවන් පොඩි පියවරක් යෝජනා කරන්න.",
+}
+
+_LEVEL_WORDS = {
+    3: ["තේරුණා", "වටහෙන්නේ", "වටහාගත්තා", "දැනෙනවා", "දැක්කා",
+        "අවබෝධ", "විපස්සනා", "සිහිය", "මනස"],
+    4: ["පුරුදු", "හුරුවෙන්නේ", "ජීවිතේ", "දවසේ", "පටන් ගන්නේ",
+        "පටන්ගන්නේ", "කරගන්නේ", "අභ්‍යාස", "ක්‍රියාත්මක", "භාවනා කරන්නේ"],
+    2: ["විශ්වාස", "ඇත්තද", "ඇත්තටම", "හරියටම", "එහෙනම්"],
+    1: ["මොකක්ද", "මොකද", "කියන්නේ", "ඇයි", "ඇකි", "කවදද",
+        "කොහෙද", "මොනවද", "හරිද"],
+}
+
+_DHAMMA_WORDS = ["ධර්ම", "බුදු", "බුද්ධ", "කර්ම", "කම්ම", "භාවනා",
+                 "සිල්", "ශීල", "අනිත්‍ය", "අනිච්ච", "දුක්ඛ", "අනාත්ම",
+                 "නිවන", "නිබ්බාන", "සංසාර", "පටිච්ච", "සතිපට්ඨාන",
+                 "සමාධි", "උපාදාන", "වේදනා", "තණහා", "මග්ග", "සත්‍ය"]
 
 
 def _load_json(name):
@@ -73,20 +105,35 @@ def _book_info(title):
     return None
 
 
+def detect_level(query):
+    """Journey level 1-4 from the user's message style. 0 = unclear."""
+    q = (query or "").lower()
+    for lvl in (3, 4, 2, 1):
+        for w in _LEVEL_WORDS[lvl]:
+            if w in q:
+                return lvl
+    return 0
+
+
 def kb_context(query, max_chars=4500):
-    """Attributed Sinhala context block for Gemini. '' if no match."""
+    """Attributed Sinhala context block for Gemini.
+    Adds journey-level guidance when the question shows a level.
+    Returns '' when nothing dhamma-related is needed."""
     wis, chs = kb_search(query)
-    if not wis and not chs:
+    lvl = detect_level(query)
+    q_low = (query or "").lower()
+    dhamma = bool(wis or chs) or any(w in q_low for w in _DHAMMA_WORDS)
+    if not dhamma:
         return ""
     parts = [
         "පහත දැක්වෙන්නේ මෙම app එකේ අයිතිකරුගේ ගුරු හිමිවරුන්ගේ "
         "(කොස්වත්තේ අරියවිමල හිමි, දේවනන්ද හාමුදුරුවන්, "
-        "පරිව්\u200dරාජක ධම්මපාල හිමි) ධර්ම දේශනා සහ පොත්වලින් ගත් කොටස්."
-        " පිළිතුරු දෙන විට: (1) මේ මූලාශ\u200d්‍ර මූලික කරගන්න. "
-        "(2) ඒවායින් උපුටා දක්වන කරුණු අවසානයේ 📖 මූලාශ\u200d්‍රය "
+        "පරිව්‍රාජක ධම්මපාල හිමි) ධර්ම දේශනා සහ පොත්වලින් ගත් කොටස්."
+        " පිළිතුරු දෙන විට: (1) මේ මූලාශ්‍ර මූලික කරගන්න. "
+        "(2) ඒවායින් උපුටා දක්වන කරුණු අවසානයේ 📖 මූලාශ්‍රය "
         "(පොත/දේශනාව + හිමිනම්) සඳහන් කරන්න. "
         "(3) ඔබ කිසිදා මෙම දහම් කතෘ ලෙස හඳුන්වා නොගන්න. "
-        "(4) link එකක් තියෙනවා නම් 🔗 වැඩිදුර අධ\u200d්‍යයනයට දෙන්න."
+        "(4) link එකක් තියෙනවා නම් 🔗 වැඩිදුර අධ්‍යයනයට දෙන්න."
     ]
     for it in wis:
         parts.append(f"【ධර්ම කරුණ — {it.get('topic', '')}】\n"
@@ -100,4 +147,7 @@ def kb_context(query, max_chars=4500):
         link = f" | 🔗 වැඩිදුර: {url}" if url else ""
         content = (ch.get("content") or "")[:1200]
         parts.append(f"【{src} · {ch.get('title', '')}】{link}\n{content}")
+    if lvl:
+        parts.append(f"【ධර්ම ගමන — මට්ටම {lvl}/4】\n{LEVEL_GUIDE[lvl]}")
+        print("[pk-kb] level:", lvl)
     return "\n\n".join(parts)[:max_chars]
