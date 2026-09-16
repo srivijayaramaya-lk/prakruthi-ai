@@ -394,6 +394,11 @@ def pk_avatar_js():
     return FileResponse("pk_avatar.js", media_type="application/javascript")
 
 
+@app.get("/face_base.png")
+def face_base():
+    return FileResponse("face_base.png", media_type="image/png")
+
+
 @app.get("/api/knowledge_stats")
 def api_knowledge_stats():
     import json
