@@ -425,6 +425,10 @@ def api_knowledge_stats():
 # ---------- v1.2 PWA (manifest + sw + icons) ----------
 from fastapi.responses import FileResponse as _FR
 
+@app.get("/googlec346f239a1a60348.html")
+def google_verification():
+    return _FR("googlec346f239a1a60348.html", media_type="text/html")
+
 @app.get("/manifest.json")
 def pwa_manifest():
     return _FR("manifest.json", media_type="application/json")
