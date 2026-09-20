@@ -2,7 +2,7 @@
 <html lang="si">
 <head>
 <meta charset="UTF-8">
-<title>ප්‍රකෘති — Sketch Face Test v11</title>
+<title>ප්‍රකෘති — Sketch Face Test v12 (Layered)</title>
 <style>
 body{font-family:'Iskoola Pota','Noto Sans Sinhala',sans-serif;background:#0f1f16;color:#e8f5ee;
   display:flex;flex-direction:column;align-items:center;min-height:100vh;margin:0;padding:24px}
@@ -12,161 +12,84 @@ canvas{border-radius:16px;box-shadow:0 8px 30px rgba(0,0,0,.4);background:#efe9d
 .btns{margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
 button{background:#2e7d50;color:#fff;border:0;border-radius:10px;padding:10px 16px;font-size:15px;cursor:pointer;font-family:inherit}
 button:hover{background:#39985f}
-#exportBtn{background:#1b5e3a}
 input[type=text]{width:min(460px,92vw);padding:10px 14px;border-radius:10px;border:1px solid #2c4a38;
   background:#16281e;color:#e8f5ee;font-size:15px;font-family:inherit;margin-top:14px;text-align:center}
-.smile-panel{margin-top:12px;display:flex;align-items:center;gap:12px;background:#16281b;
-  padding:10px 20px;border-radius:12px;font-size:14px;color:#bfe3cf}
-.smile-panel input{cursor:pointer;accent-color:#2e7d50;width:180px}
-.pickers{margin-top:12px;display:flex;gap:16px;align-items:center;font-size:13px;color:#9fc7b2}
-.pickers input{width:42px;height:28px;padding:0;border:1px solid #2c4a38;background:none;cursor:pointer}
 .msg{color:#ffd479;font-size:14px;margin-top:12px;min-height:20px;text-align:center}
-#expTa{display:none;width:min(560px,94vw);height:70px;margin-top:10px;background:#16281e;color:#bfe3cf;
-  border:1px solid #2c4a38;border-radius:10px;font-size:12px;padding:8px}
 .note{color:#7fae95;font-size:12px;max-width:660px;line-height:1.9;margin-top:12px;text-align:center}
 </style>
 </head>
 <body>
-<h1>🎭 ප්‍රකෘති — Sketch Face Test Lab v11</h1>
+<h1>🎭 ප්‍රකෘති — Sketch Face Test Lab v12 (Layered)</h1>
 <p class="sub">app එකට සම්බන්ධ නෑ — local test එකක් 🧪</p>
 <canvas id="cv" width="420" height="420"></canvas>
 
 <div class="btns">
-  <button id="calEyes">🎯 ඇස් calibrate</button>
-  <button id="calMouth">👄 කට calibrate</button>
   <button id="blinkBtn">👁 ඇහිලුම</button>
+  <button id="aBtn">🗣️ "අ"</button>
+  <button id="oBtn">🗣️ "ඔ"</button>
+  <button id="iBtn">🗣️ "ඉ"</button>
   <button id="speakBtn">🗣️ කතා කරන්න</button>
-  <button id="exportBtn">📋 calibration copy</button>
 </div>
-
-<div class="smile-panel">
-  <label>😌 සිනහව:</label>
-  <input type="range" id="smileRange" min="0" max="100" value="0">
-  <span id="smileVal">0%</span>
-</div>
-
 <input type="text" id="txt" value="සුබ ආරංචියක්! අද වැඩ ඔක්කොම සාර්ථකයි.">
-<div class="pickers">
-  <label>👁 eyelid පාට <input type="color" id="lidColor"></label>
-</div>
-<textarea id="expTa" readonly></textarea>
 <div class="msg" id="msg"></div>
 <p class="note">
-  <b>📋 calibration copy:</b> ඔබපු ඇස්/කට තැන් numbers විදියට copy වෙනවා — ඒක chat එකට paste කරන්න.
+  <b>v12 — Layered swap:</b> ඔයාගේම sketch එකේ කට shapes (mouth_a/o/i.png) කෙලින්ම
+  මාරු වෙනවා — classic 2D animation විදියටම. ඇස් blink eyelid එකෙන්ම.
+  Buttons 3 ඔබලා එක එක shape බලන්න, ඊට පස්සේ කතා කරවලා බලන්න.
 </p>
 <script>
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d'), msg=document.getElementById('msg');
-const BREATH=0.012, BLINK_MS=150;
+const BLINK_MS=150;
 
-const base=document.createElement('canvas'); base.width=cv.width; base.height=cv.height;
-const bctx=base.getContext('2d');
-const tmp=document.createElement('canvas'); tmp.width=cv.width; tmp.height=cv.height;
-const tctx=tmp.getContext('2d');
+/* ---------- images ---------- */
+const files={ closed:'face_base.png', A:'mouth_a.png', O:'mouth_o.png', E:'mouth_i.png' };
+const imgs={}; let loaded=0; const failed=[];
+Object.keys(files).forEach(k=>{
+  const im=new Image(); im.src=files[k]; imgs[k]=im;
+  im.onload=()=>{ loaded++; done(); };
+  im.onerror=()=>{ failed.push(files[k]); done(); };
+});
+function done(){
+  if(loaded+failed.length===4){
+    msg.textContent = failed.length ? ('⚠️ නැති files: '+failed.join(', ')) : '✅ images 4ම load වුනා';
+  }
+}
 
-let eyes={l:{x:.355,y:.42},r:{x:.645,y:.42},w:.105};
-let mouth=null;
+/* ---------- eyes calibration (saved earlier) ---------- */
+let eyes={l:{x:.5857,y:.5452}, r:{x:.3429,y:.5500}, w:.15057};
 let lidColor='#f0eae0';
 try{ const e=JSON.parse(localStorage.getItem('pk_eyes')||'null'); if(e) eyes=e; }catch(e){}
-try{ mouth=JSON.parse(localStorage.getItem('pk_mouth')||'null'); }catch(e){}
 try{ const c=JSON.parse(localStorage.getItem('pk_lid')||'null'); if(c) lidColor=c; }catch(e){}
-function save(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
 
-const lidIn=document.getElementById('lidColor');
-lidIn.value=lidColor;
-lidIn.oninput=()=>{ lidColor=lidIn.value; save('pk_lid',lidColor); };
-
-const smileRange=document.getElementById('smileRange'), smileVal=document.getElementById('smileVal');
-let smileSlider=0;
-smileRange.oninput=()=>{ smileSlider=smileRange.value/100; smileVal.textContent=smileRange.value+'%'; };
-
-const img=new Image(); img.src='face_base.png';
-let ready=false, geo=null;
-img.onload=()=>{
-  ready=true;
-  const s=Math.min(cv.width/img.width,cv.height/img.height);
-  geo={dw:img.width*s, dh:img.height*s};
-  geo.ox=(cv.width-geo.dw)/2; geo.oy=(cv.height-geo.dh)/2;
-  msg.textContent='✅ face_base.png load වුනා';
-};
-img.onerror=()=>{ msg.textContent='⚠️ face_base.png මේ html එක තියෙන folder එකේ ඕනේ'; };
-
+/* ---------- blink ---------- */
 let blinkUntil=0;
 (function sb(){ setTimeout(()=>{ blinkUntil=performance.now()+BLINK_MS; sb(); },2600+Math.random()*3400); })();
 document.getElementById('blinkBtn').onclick=()=>{ blinkUntil=performance.now()+BLINK_MS; };
 
-let cal=null;
-document.getElementById('calEyes').onclick=()=>{ cal='eyeL'; msg.textContent='👆 වම් ඇසේ මැද click'; };
-document.getElementById('calMouth').onclick=()=>{ cal='mouthL'; msg.textContent='👆 කටේ වම් කොන click කරන්න'; };
-cv.addEventListener('click',ev=>{
-  if(!cal||!ready) return;
-  const rc=cv.getBoundingClientRect();
-  const x=(ev.clientX-rc.left)/rc.width, y=(ev.clientY-rc.top)/rc.height;
-  if(cal==='eyeL'){ eyes.l={x,y}; cal='eyeR'; msg.textContent='👆 දකුණු ඇසේ මැද click'; }
-  else if(cal==='eyeR'){
-    eyes.r={x,y}; eyes.w=Math.abs(eyes.r.x-eyes.l.x)*0.62;
-    save('pk_eyes',eyes); cal=null;
-    msg.textContent='✅ ඇස් save වුනා'; blinkUntil=performance.now()+BLINK_MS;
-  }
-  else if(cal==='mouthL'){ mouth=mouth||{l:null,r:null}; mouth.l={x,y}; cal='mouthR'; msg.textContent='👆 කටේ දකුණු කොන click'; }
-  else if(cal==='mouthR'){
-    mouth.r={x,y}; save('pk_mouth',mouth); cal=null;
-    msg.textContent='✅ කට save වුනා! "කතා කරන්න" බලන්න';
-  }
-});
-
-/* v11: export calibration */
-document.getElementById('exportBtn').onclick=()=>{
-  if(!mouth||!mouth.l||!mouth.r){ msg.textContent='⚠️ මුලින්ම කට calibrate කරලා save කරන්න'; return; }
-  const data={
-    eyes:{l:eyes.l,r:eyes.r,w:eyes.w},
-    mouth:{l:mouth.l,r:mouth.r},
-    lid:lidColor
-  };
-  const s=JSON.stringify(data);
-  const ta=document.getElementById('expTa');
-  ta.style.display='block'; ta.value=s; ta.focus(); ta.select();
-  try{ document.execCommand('copy'); }catch(e){}
-  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(s).catch(()=>{});
-  msg.textContent='📋 copy වුනා! මේ text එක chat එකට paste කරන්න';
-};
-
+/* ---------- visemes ---------- */
 function visemeFor(ch){
   if(ch===' '||'.,!?;:—'.indexOf(ch)>=0) return 'closed';
   ch=ch.toUpperCase();
-  const A='අආඇඈාැඓA';
-  const O='ඔඕඋඌූොෝෞOUW';
-  const I='ඉඊිීඑඒෙේෛEIY';
-  if(A.indexOf(ch)>=0) return 'A';
-  if(O.indexOf(ch)>=0) return 'O';
-  if(I.indexOf(ch)>=0) return 'E';
+  if('අආඇඈාැඓA'.indexOf(ch)>=0) return 'A';
+  if('ඔඕඋඌූොෝෞOUW'.indexOf(ch)>=0) return 'O';
+  if('ඉඊිීඑඒෙේෛEIY'.indexOf(ch)>=0) return 'E';
   return 'M';
 }
 
+/* ---------- speaking (rhythm + holds) ---------- */
 let speak={active:false,viseme:'closed',timer:null};
-let targetOpen=0, targetStretch=0;
 function jit(v){ return v*(0.85+Math.random()*0.3); }
 function speakText(text){
   if(!text) return;
-  if(!mouth||!mouth.l||!mouth.r){ msg.textContent='⚠️ මුලින්ම 👄 කට calibrate කරන්න'; return; }
   clearTimeout(speak.timer);
   const chars=text.split(''); let i=0; speak.active=true;
   const step=()=>{
-    if(i>=chars.length){
-      speak.active=false; speak.viseme='closed';
-      targetOpen=0; targetStretch=0;
-      msg.textContent='✅ කතාව ඉවරයි'; return;
-    }
+    if(i>=chars.length){ speak.active=false; speak.viseme='closed'; msg.textContent='✅ කතාව ඉවරයි'; return; }
     const ch=chars[i++];
     speak.viseme=visemeFor(ch);
-    if(speak.viseme==='A'){ targetStretch=jit(0.55); targetOpen=jit(0.55); }
-    else if(speak.viseme==='O'){ targetStretch=jit(-0.4); targetOpen=jit(0.4); }
-    else if(speak.viseme==='E'){ targetStretch=jit(0.95); targetOpen=jit(0.18); }
-    else if(speak.viseme==='M'){ targetStretch=0.12; targetOpen=0.04; }
-    else { targetStretch=0; targetOpen=0; }
     let d;
-    if(speak.viseme==='closed'){
-      d=('.,!?;:—'.indexOf(ch)>=0)?200+Math.random()*80:80+Math.random()*40;
-    } else if(speak.viseme==='M'){ d=95+Math.random()*30; }
+    if(speak.viseme==='closed'){ d=('.,!?;:—'.indexOf(ch)>=0)?200+Math.random()*80:80+Math.random()*40; }
+    else if(speak.viseme==='M'){ d=95+Math.random()*30; }
     else { d=150+Math.random()*60; }
     speak.timer=setTimeout(step,d);
   };
@@ -174,24 +97,14 @@ function speakText(text){
 }
 document.getElementById('speakBtn').onclick=()=>speakText(document.getElementById('txt').value);
 
-function patchShift(sx0,sy0,sw,sh,dx,dy,mcx,mcy,mrx,mry){
-  tctx.clearRect(0,0,tmp.width,tmp.height);
-  tctx.filter='blur(0.7px)';
-  tctx.drawImage(base,sx0,sy0,sw,sh,sx0+dx,sy0+dy,sw,sh);
-  tctx.filter='none';
-  tctx.save();
-  tctx.globalCompositeOperation='destination-in';
-  tctx.translate(mcx,mcy); tctx.scale(mrx/mry,1);
-  const g=tctx.createRadialGradient(0,0,0,0,0,mry);
-  g.addColorStop(0,'rgba(0,0,0,1)');
-  g.addColorStop(0.45,'rgba(0,0,0,0.97)');
-  g.addColorStop(0.8,'rgba(0,0,0,0.5)');
-  g.addColorStop(1,'rgba(0,0,0,0)');
-  tctx.fillStyle=g;
-  tctx.fillRect(-mry*2.2,-mry*2.2,mry*4.4,mry*4.4);
-  tctx.restore();
-  bctx.drawImage(tmp,0,0);
-}
+/* single-shape preview buttons */
+let holdViseme=null, holdUntil=0;
+function hold(v){ holdViseme=v; holdUntil=performance.now()+900; }
+document.getElementById('aBtn').onclick=()=>hold('A');
+document.getElementById('oBtn').onclick=()=>hold('O');
+document.getElementById('iBtn').onclick=()=>hold('E');
+
+/* ---------- eyelid ---------- */
 function drawLid(cx,cy,faceW){
   const w=eyes.w*faceW, h=w*0.42;
   ctx.fillStyle=lidColor;
@@ -201,73 +114,54 @@ function drawLid(cx,cy,faceW){
   ctx.quadraticCurveTo(cx,cy+h*0.4,cx+w/2.6,cy+h*0.05); ctx.stroke();
 }
 
-let curOpen=0, curStretch=0, curSmile=0;
+/* ---------- loop ---------- */
+
+/* watermark cover (Gemini mark, bottom-right) */
+function coverWatermark(g){
+  const px=g.ox+g.dw*0.845, py=g.oy+g.dh*0.855;
+  const pw=g.dw*0.17, ph=g.dh*0.17;
+  const cx=px+pw*0.5, cy=py+ph*0.5;
+  const rad=ctx.createRadialGradient(cx,cy,pw*0.15,cx,cy,pw*0.8);
+  rad.addColorStop(0,'rgba(234,231,226,1)');
+  rad.addColorStop(0.75,'rgba(234,231,226,0.95)');
+  rad.addColorStop(1,'rgba(234,231,226,0)');
+  ctx.fillStyle=rad;
+  ctx.fillRect(px-3,py-3,pw+8,ph+8);
+}
+
+let geo=null;
 function loop(t){
   ctx.clearRect(0,0,cv.width,cv.height);
-  if(ready&&geo){
-    const {dw,dh,ox,oy}=geo;
-    bctx.clearRect(0,0,cv.width,cv.height);
-    bctx.drawImage(img,ox,oy,dw,dh);
-
-    if(mouth&&mouth.l&&mouth.r){
-      const mx=ox+(mouth.l.x+mouth.r.x)/2*dw;
-      const my=oy+(mouth.l.y+mouth.r.y)/2*dh;
-      const mw=Math.abs(mouth.r.x-mouth.l.x)*dw;
-
-      curOpen+=(targetOpen-curOpen)*0.25;
-      curStretch+=(targetStretch-curStretch)*0.25;
-      const smileGoal=speak.active?smileSlider*0.35:smileSlider;
-      curSmile+=(smileGoal-curSmile)*0.15;
-
-      const stretchPx=(curStretch+curSmile*0.5)*mw*0.10;
-      const smileUp=curSmile*mw*0.07;
-      const openPx=curOpen*mw*0.13;
-
-      if(Math.abs(stretchPx)>0.25||smileUp>0.2){
-        const lcx=ox+mouth.l.x*dw;
-        const rcx=ox+mouth.r.x*dw;
-        patchShift(lcx-mw*0.52,my-mw*0.28,mw*0.78,mw*0.56,
-          -stretchPx,-smileUp, lcx,my,mw*0.60,mw*0.42);
-        patchShift(rcx-mw*0.26,my-mw*0.28,mw*0.78,mw*0.56,
-          stretchPx,-smileUp, rcx,my,mw*0.60,mw*0.42);
-      }
-      if(openPx>0.4){
-        const up=openPx*0.3, down=openPx*0.7;
-        patchShift(mx-mw*0.9,my-mw*0.36,mw*1.8,mw*0.36, 0,-up,
-          mx,my-mw*0.10,mw*1.15,mw*0.34);
-        patchShift(mx-mw*1.0,my,mw*2.0,cv.height-my, 0,down,
-          mx,my+mw*0.30,mw*1.35,mw*1.0);
-      }
+  if(loaded===4&&failed.length===0){
+    /* geometry — face_base එකෙන් එක වරක් විතරයි (හැම image එකකටම එකම rect) */
+    if(!geo){
+      const b=imgs.closed;
+      const s=Math.min(cv.width/b.width,cv.height/b.height);
+      geo={dw:b.width*s, dh:b.height*s};
+      geo.ox=(cv.width-geo.dw)/2; geo.oy=(cv.height-geo.dh)/2;
     }
+    let v=speak.viseme;
+    if(!speak.active&&performance.now()<holdUntil) v=holdViseme;
+    const key=(v==='A'||v==='O'||v==='E')?v:'closed';
+    const im=imgs[key];
 
-    const speaking=speak.active;
-    const bobX=speaking?Math.sin(t/470)*0.9:0;
-    const bobY=speaking?Math.sin(t/320)*1.1:0;
-    const b=1+BREATH*Math.sin(t/750);
+    /* breathing + head bob */
+    const acting=speak.active;
+    const bobX=acting?Math.sin(t/470)*0.9:0;
+    const bobY=acting?Math.sin(t/320)*1.1:0;
+    const br=1+0.012*Math.sin(t/750);
     ctx.save();
     ctx.translate(cv.width/2+bobX,geo.oy+geo.dh+bobY);
-    ctx.scale(b,b);
+    ctx.scale(br,br);
     ctx.translate(-cv.width/2,-(geo.oy+geo.dh));
-    ctx.drawImage(base,0,0);
+    /* layered swap — හැම image එකකුත් එකම rect එකට */
+    ctx.drawImage(im,geo.ox,geo.oy,geo.dw,geo.dh);
+        coverWatermark(geo);
     if(performance.now()<blinkUntil){
-      drawLid(ox+eyes.l.x*dw,oy+eyes.l.y*dh,dw);
-      drawLid(ox+eyes.r.x*dw,oy+eyes.r.y*dh,dw);
+      drawLid(geo.ox+eyes.l.x*geo.dw, geo.oy+eyes.l.y*geo.dh, geo.dw);
+      drawLid(geo.ox+eyes.r.x*geo.dw, geo.oy+eyes.r.y*geo.dh, geo.dw);
     }
     ctx.restore();
-
-    if(cal){
-      ctx.strokeStyle='#ff5a5a'; ctx.lineWidth=1.5;
-      const pts=[];
-      if(cal==='eyeL') pts.push(eyes.l);
-      if(cal==='eyeR'){ pts.push(eyes.l,eyes.r); }
-      if(cal==='mouthL') pts.push(mouth&&mouth.l?mouth.l:null);
-      if(cal==='mouthR'&&mouth){ pts.push(mouth.l,mouth.r); }
-      pts.forEach(p=>{ if(!p) return;
-        const px=ox+p.x*dw, py=oy+p.y*dh;
-        ctx.beginPath(); ctx.moveTo(px-8,py); ctx.lineTo(px+8,py);
-        ctx.moveTo(px,py-8); ctx.lineTo(px,py+8); ctx.stroke();
-      });
-    }
   }
   requestAnimationFrame(loop);
 }

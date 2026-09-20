@@ -399,6 +399,23 @@ def face_base():
     return FileResponse("face_base.png", media_type="image/png")
 
 
+@app.get("/mouth_a.png")
+def mouth_a():
+    return FileResponse("mouth_a.png", media_type="image/png")
+
+@app.get("/mouth_o.png")
+def mouth_o():
+    return FileResponse("mouth_o.png", media_type="image/png")
+
+@app.get("/mouth_i.png")
+def mouth_i():
+    return FileResponse("mouth_i.png", media_type="image/png")
+
+@app.get("/mouth_smile.png")
+def mouth_smile():
+    return FileResponse("mouth_smile.png", media_type="image/png")
+
+
 @app.get("/api/knowledge_stats")
 def api_knowledge_stats():
     import json

@@ -119,7 +119,7 @@
       var v = siVoice || pickVoice();
       if (v) u.voice = v;
       u.lang = v ? v.lang : "si-LK";
-      u.rate = 1; u.pitch = 1;
+      u.rate = 0.95; u.pitch = 0.7;
       speechSynthesis.speak(u);
     } catch (e) {}
   }
