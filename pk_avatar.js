@@ -22,10 +22,7 @@
     'z-index:9998;pointer-events:none;}' +
     '.pk-face-wrap canvas{display:block;width:128px;height:128px;border-radius:18px;' +
     'box-shadow:0 6px 22px rgba(0,0,0,.35);background:#efe9df;pointer-events:auto;cursor:pointer;}' +
-    '.pk-face-wrap.big{position:fixed;inset:0;width:100%;height:100%;transform:none;' +
-    'background:rgba(0,0,0,.62);pointer-events:auto;display:flex;' +
-    'align-items:center;justify-content:center;z-index:10000;}' +
-    '.pk-face-wrap.big canvas{width:min(92vw,86vh);height:min(92vw,86vh);}' +
+    '.pk-face-wrap.big canvas{width:min(78vw,60vh);height:min(78vw,60vh);border-radius:24px;}' +
     '@media (max-width:480px){.pk-face-wrap canvas{width:96px;height:96px;border-radius:14px}}';
   document.head.appendChild(css);
 
@@ -42,7 +39,7 @@
     e.stopPropagation();
     wrap.classList.toggle('big');
   });
-  wrap.addEventListener('click', function () {
+   wrap.addEventListener('click', function () {
     if (wrap.classList.contains('big')) wrap.classList.remove('big');
   });
 
@@ -153,7 +150,7 @@
     if (imgs.closed && imgs.closed.complete && imgs.closed.naturalWidth) {
       if (!geo) {
         var b = imgs.closed;
-        var s = Math.min(W / b.width, H / b.height);
+        var s = Math.min(W / b.width, H / b.height) * 1.07;
         geo = { dw: b.width * s, dh: b.height * s };
         geo.ox = (W - geo.dw) / 2; geo.oy = (H - geo.dh) / 2;
       }
