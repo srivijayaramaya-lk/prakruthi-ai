@@ -354,6 +354,7 @@ async function send() {
       body: JSON.stringify({prompt: text, client_id: PID})});
     const data = await r.json();
     addMsg(data.output, "ai", {success: data.success, precept: data.gate.precept,
+    try{ if(window.PKFace && PKFace.speak) PKFace.speak(data.output); }catch(e){}
       note_flag: data.gate.note_flag}, data.note);
   } catch (e) {
     addDiv("msg ai", "🪷 සම්බන්ධතාවයේ දෝෂයක් — server එක ක්‍රියාත්මකද?");
