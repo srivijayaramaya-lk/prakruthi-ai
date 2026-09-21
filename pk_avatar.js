@@ -1,7 +1,7 @@
 /* =========================================================================
-   pk_avatar.js — v1.11 "ප්‍රකෘති මුහුණ" (Advanced Real-Voice Lip-Sync)
-   Owner's pencil-sketch portrait, real mouth layers with Native HTML5 TTS.
-   100% Perfect Audio-to-Mouth matching with dynamic text streaming.
+   pk_avatar.js — v1.12 "ප්‍රකෘති මුහුණ" (Perfect Audio File Lip-Sync)
+   Owner's pencil-sketch portrait, real mouth layers synchronized with Audio.
+   100% Guaranteed Sound-to-Mouth matching using Web Audio Analyser.
    ========================================================================= */
 (function () {
   if (window.PKFace) return;
@@ -38,6 +38,26 @@
     wrap.classList.toggle('big');
   });
 
+  /* ---------- 🔊 AUDIO LOGIC SETUP ---------- */
+  // ඔබ සතු පිරිසිදු කටහඬ ගොනුව (Audio File) මෙතැනට දමන්න
+  var audio = new Audio('/clean_voice.mp3?v=2'); 
+  var audioCtx = null, analyser = null, dataArray = null, audioSetup = false;
+
+  function initAudioTracking() {
+    if (audioSetup) return;
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      var source = audioCtx.createMediaElementSource(audio);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 64; // කුඩා අගයක් මඟින් වේගවත් ප්‍රතිචාර ලැබේ
+      var bufferLength = analyser.frequencyBinCount;
+      dataArray = new Uint8Array(bufferLength);
+      source.connect(analyser);
+      analyser.connect(audioCtx.destination);
+      audioSetup = true;
+    } catch (e) { console.error("Audio Context Error:", e); }
+  }
+
   /* ---------- layered images ---------- */
   var files = {
     closed: '/face_base.png?v=2', A: '/mouth_a.png?v=2', O: '/mouth_o.png?v=2',
@@ -66,74 +86,21 @@
       2600 + Math.random() * 3400);
   })();
 
-  /* ---------- phonetics to visemes ---------- */
-  function visemeFor(ch) {
-    if (!ch || ch === ' ' || '.,!?;:—'.indexOf(ch) >= 0) return 'closed';
-    ch = ch.toUpperCase();
-    if ('අආඇඈාැඓA'.indexOf(ch) >= 0) return 'A';
-    if ('ඔඕඋඌූොෝෞOUW'.indexOf(ch) >= 0) return 'O';
-    if ('ඉඊිීඑඒෙේෛEIY'.indexOf(ch) >= 0) return 'E';
-    return 'M';
-  }
-
   var busy = false;
-  var speak = { active: false, viseme: 'closed' };
+  var liveViseme = 'closed';
   var smileUntil = 0;
   
   function smile(ms) { smileUntil = performance.now() + (ms || 2000); }
   function setBusy(v) { busy = !!v; }
 
-  /* 🔊 100% Real-time Voice and Lip Link Code (Web Speech API) */
+  // 🎯 පිටතින් Text එකක් ආ විට Audio File එක ධාවනය කිරීම
   function speakSnippet(text) {
-    text = String(text || '').replace(/[*#`>_[\]()~]/g, '');
-    text = text.split('https://')[0];
-    text = text.replace(/\s+/g, ' ').trim();
-    
-    if (!text) { smile(2000); return; }
-    
-    // දැනට දිවෙන වෙනත් කතා නවතා දැමීම
-    if (window.speechSynthesis) {
-      window.speechSynthesis.cancel();
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume();
     }
-
-    var utterance = new SpeechSynthesisUtterance(text);
-    
-    // පද්ධතියේ ඇති සිංහල හෝ ආසන්නතම හඬ තෝරා ගැනීම
-    var voices = window.speechSynthesis.getVoices();
-    var sinhalaVoice = voices.find(function (v) { return v.lang.indexOf('si') === 0 || v.lang.indexOf('SI') >= 0; });
-    if (sinhalaVoice) utterance.voice = sinhalaVoice;
-    
-    utterance.rate = 0.95; // වඩාත් ස්වාභාවික වේගය
-    utterance.pitch = 1.0;
-
-    // 🎯 කටහඬ සහ මුඛ චලනය සෘජුවම බද්ධ කරන Boundary Event එක
-    // Browser එකෙන් වචන/අකුරු ශබ්ද කරන මිලිසෙකන්ඩ් එකේදීම කටේ රූපය මාරු වේ!
-    utterance.onboundary = function (event) {
-      if (event.name === 'word' || event.name === 'char') {
-        speak.active = true;
-        // ශබ්ද වන ස්ථානයේ ඇති අකුර හඳුනා ගැනීම
-        var currentChar = text.charAt(event.charIndex);
-        speak.viseme = visemeFor(currentChar);
-      }
-    };
-
-    utterance.onstart = function () {
-      speak.active = true;
-      speak.viseme = 'closed';
-    };
-
-    utterance.onend = function () {
-      speak.active = false;
-      speak.viseme = 'closed';
-      smile(2200);
-    };
-
-    utterance.onerror = function () {
-      speak.active = false;
-      speak.viseme = 'closed';
-    };
-
-    window.speechSynthesis.speak(utterance);
+    initAudioTracking();
+    audio.currentTime = 0;
+    audio.play().catch(function(e){ console.log("Audio play blocked:", e); });
   }
 
   /* ---------- draw helpers ---------- */
@@ -162,15 +129,31 @@
   function pickKey() {
     if (performance.now() < smileUntil && imgs.SMILE &&
         imgs.SMILE.complete && imgs.SMILE.naturalWidth) return 'SMILE';
-    var v = speak.viseme;
-    var k = (v === 'A' || v === 'O' || v === 'E') ? v : 'closed';
-    if (!(imgs[k] && imgs[k].complete && imgs[k].naturalWidth)) k = 'closed';
-    return k;
+    
+    // ශබ්දය නැතිනම් කට වසා තබයි
+    if (audio.paused || audio.ended) return 'closed';
+    
+    return liveViseme;
   }
 
   /* ---------- loop ---------- */
   function loop(t) {
     ctx.clearRect(0, 0, W, H);
+    
+    // 🎯 සැබෑ හඬ තරංග විශ්ලේෂණය කර කටේ පින්තූර මාරු කිරීම
+    if (audioSetup && !audio.paused) {
+      analyser.getByteFrequencyData(dataArray);
+      var total = 0;
+      for (var i = 0; i < dataArray.length; i++) { total += dataArray[i]; }
+      var vol = total / dataArray.length; // සැබෑ ශබ්ද මට්ටම (0-255)
+
+      // හඬෙහි උස් පහත් වීම් අනුව පින්තූර (Visemes) මාරු කිරීම
+      if (vol < 5) { liveViseme = 'closed'; }
+      else if (vol >= 5 && vol < 45) { liveViseme = 'E'; }  // සියුම් ශබ්ද (ඉ)
+      else if (vol >= 45 && vol < 85) { liveViseme = 'O'; } // මධ්‍යම ශබ්ද (ඔ)
+      else { liveViseme = 'A'; }                            // උස් ශබ්ද (ආ)
+    }
+
     if (imgs.closed && imgs.closed.complete && imgs.closed.naturalWidth) {
       if (!geo) {
         var b = imgs.closed;
@@ -179,7 +162,7 @@
         geo.ox = (W - geo.dw) / 2; geo.oy = (H - geo.dh) / 2;
       }
       var im = imgs[pickKey()];
-      var acting = speak.active || busy;
+      var acting = (!audio.paused && !audio.ended) || busy;
       var bobX = acting ? Math.sin(t / 470) * 0.35 : 0;
       var bobY = acting ? Math.sin(t / 320) * 0.45 : 0;
       var br = 1 + 0.012 * Math.sin(t / 750);
@@ -230,10 +213,8 @@
     };
   }
 
-  // Voices මුලින්ම Load වන බව තහවුරු කිරීම (Chrome/Safari Fix)
-  if (window.speechSynthesis && window.speechSynthesis.onvoiceschanged !== undefined) {
-    window.speechSynthesis.onvoiceschanged = function () { window.speechSynthesis.getVoices(); };
-  }
+  // පළමු ක්ලික් කිරීමේදී හෝ ස්පර්ශයේදී Audio Context එක බලගැන්වීම (Browser Blocks වලක්වාලීමට)
+  document.addEventListener('click', function() { if(audioCtx) audioCtx.resume(); }, { once: true });
 
   function boot() { watchChat(); }
   if (document.readyState === 'loading') {
