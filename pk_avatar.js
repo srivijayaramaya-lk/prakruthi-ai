@@ -44,9 +44,9 @@
   });
 
   /* ---------- layered images ---------- */
-  var files = {
-    closed: '/face_base.png', A: '/mouth_a.png', O: '/mouth_o.png',
-    E: '/mouth_i.png', SMILE: '/mouth_smile.png'
+    var files = {
+    closed: '/face_base.png?v=2', A: '/mouth_a.png?v=2', O: '/mouth_o.png?v=2',
+    E: '/mouth_i.png?v=2', SMILE: '/mouth_smile.png?v=2'
   };
   var imgs = {}, loaded = 0, arrived = 0;
   Object.keys(files).forEach(function (k) {
