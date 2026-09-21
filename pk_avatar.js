@@ -181,7 +181,7 @@
     var orig = window.fetch;
     window.fetch = function (url) {
       var u = '', isChat = false;
-      try { u = String(url).split('?')[0]; isChat = /\/chat$/.test(u); } catch (e) {}
+      try { u = String(url).split('?')[0]; isChat = /\/(chat|ask)$/.test(u); } catch (e) {}
       if (!isChat) return orig.apply(this, arguments);
       setBusy(true);
       var p = orig.apply(this, arguments);
@@ -192,7 +192,7 @@
               res.clone().json().then(function (d) {
                 setBusy(false);
                 var t = '';
-                if (d && typeof d === 'object') t = d.output || d.reply || d.text || '';
+                if (d && typeof d === 'object') t = d.output || d.reply || d.text || d.response_text || '';
                 speakSnippet(t);
               }).catch(function () { setBusy(false); smile(1500); });
             } catch (e) { setBusy(false); }
