@@ -150,7 +150,7 @@
     if (imgs.closed && imgs.closed.complete && imgs.closed.naturalWidth) {
       if (!geo) {
         var b = imgs.closed;
-        var s = Math.min(W / b.width, H / b.height) * 1.07;
+        var s = Math.max(W / b.width, H / b.height) * 1.07;
         geo = { dw: b.width * s, dh: b.height * s };
         geo.ox = (W - geo.dw) / 2; geo.oy = (H - geo.dh) / 2;
       }
