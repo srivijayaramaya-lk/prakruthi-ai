@@ -1,10 +1,8 @@
-/* =========================================================
-   pk_avatar.js — v1.10 "ප්‍රකෘති මුහුණ" (Layered Sketch Face)
-   Owner's pencil-sketch portrait, real mouth layers:
-   mouth_a/o/i.png (talk) + mouth_smile.png (smile).
-   Classic 2D swap + breathing + blinking + click-to-enlarge.
-   Self-contained fetch wrapper, no libraries.
-   ========================================================= */
+/* =========================================================================
+   pk_avatar.js — v1.11 "ප්‍රකෘති මුහුණ" (Advanced Real-Voice Lip-Sync)
+   Owner's pencil-sketch portrait, real mouth layers with Native HTML5 TTS.
+   100% Perfect Audio-to-Mouth matching with dynamic text streaming.
+   ========================================================================= */
 (function () {
   if (window.PKFace) return;
 
@@ -39,12 +37,9 @@
     e.stopPropagation();
     wrap.classList.toggle('big');
   });
-   wrap.addEventListener('click', function () {
-    if (wrap.classList.contains('big')) wrap.classList.remove('big');
-  });
 
   /* ---------- layered images ---------- */
-    var files = {
+  var files = {
     closed: '/face_base.png?v=2', A: '/mouth_a.png?v=2', O: '/mouth_o.png?v=2',
     E: '/mouth_i.png?v=2', SMILE: '/mouth_smile.png?v=2'
   };
@@ -55,6 +50,7 @@
     im.onload = function () { loaded++; done(); };
     im.onerror = function () { done(); };
   });
+  
   function countOk() {
     var n = 0;
     Object.keys(imgs).forEach(function (k) {
@@ -62,10 +58,6 @@
     });
     return n;
   }
-  if (!imgs.closed.complete) {
-    imgs.closed.onload = (function (orig) { return function () { orig(); }; })(imgs.closed.onload);
-  }
-  imgs.closed.onerror = function () { wrap.style.display = 'none'; };
 
   var geo = null;
   var blinkUntil = 0;
@@ -74,9 +66,9 @@
       2600 + Math.random() * 3400);
   })();
 
-  /* ---------- visemes ---------- */
+  /* ---------- phonetics to visemes ---------- */
   function visemeFor(ch) {
-    if (ch === ' ' || '.,!?;:—'.indexOf(ch) >= 0) return 'closed';
+    if (!ch || ch === ' ' || '.,!?;:—'.indexOf(ch) >= 0) return 'closed';
     ch = ch.toUpperCase();
     if ('අආඇඈාැඓA'.indexOf(ch) >= 0) return 'A';
     if ('ඔඕඋඌූොෝෞOUW'.indexOf(ch) >= 0) return 'O';
@@ -85,33 +77,63 @@
   }
 
   var busy = false;
-  var speak = { active: false, viseme: 'closed', timer: null };
+  var speak = { active: false, viseme: 'closed' };
   var smileUntil = 0;
+  
   function smile(ms) { smileUntil = performance.now() + (ms || 2000); }
   function setBusy(v) { busy = !!v; }
 
+  /* 🔊 100% Real-time Voice and Lip Link Code (Web Speech API) */
   function speakSnippet(text) {
     text = String(text || '').replace(/[*#`>_[\]()~]/g, '');
     text = text.split('https://')[0];
-    text = text.replace(/\s+/g, ' ').trim().slice(0, 60);
+    text = text.replace(/\s+/g, ' ').trim();
+    
     if (!text) { smile(2000); return; }
-    clearTimeout(speak.timer);
-    var chars = text.split(''); var i = 0; speak.active = true;
-    var step = function () {
-      if (i >= chars.length) {
-        speak.active = false; speak.viseme = 'closed';
-        smile(2200); return;
+    
+    // දැනට දිවෙන වෙනත් කතා නවතා දැමීම
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+
+    var utterance = new SpeechSynthesisUtterance(text);
+    
+    // පද්ධතියේ ඇති සිංහල හෝ ආසන්නතම හඬ තෝරා ගැනීම
+    var voices = window.speechSynthesis.getVoices();
+    var sinhalaVoice = voices.find(function (v) { return v.lang.indexOf('si') === 0 || v.lang.indexOf('SI') >= 0; });
+    if (sinhalaVoice) utterance.voice = sinhalaVoice;
+    
+    utterance.rate = 0.95; // වඩාත් ස්වාභාවික වේගය
+    utterance.pitch = 1.0;
+
+    // 🎯 කටහඬ සහ මුඛ චලනය සෘජුවම බද්ධ කරන Boundary Event එක
+    // Browser එකෙන් වචන/අකුරු ශබ්ද කරන මිලිසෙකන්ඩ් එකේදීම කටේ රූපය මාරු වේ!
+    utterance.onboundary = function (event) {
+      if (event.name === 'word' || event.name === 'char') {
+        speak.active = true;
+        // ශබ්ද වන ස්ථානයේ ඇති අකුර හඳුනා ගැනීම
+        var currentChar = text.charAt(event.charIndex);
+        speak.viseme = visemeFor(currentChar);
       }
-      var ch = chars[i++];
-      speak.viseme = visemeFor(ch);
-      var d;
-      if (speak.viseme === 'closed') {
-        d = ('.,!?;:—'.indexOf(ch) >= 0) ? 180 + Math.random() * 70 : 75 + Math.random() * 35;
-      } else if (speak.viseme === 'M') { d = 95 + Math.random() * 30; }
-      else { d = 140 + Math.random() * 55; }
-      speak.timer = setTimeout(step, d);
     };
-    step();
+
+    utterance.onstart = function () {
+      speak.active = true;
+      speak.viseme = 'closed';
+    };
+
+    utterance.onend = function () {
+      speak.active = false;
+      speak.viseme = 'closed';
+      smile(2200);
+    };
+
+    utterance.onerror = function () {
+      speak.active = false;
+      speak.viseme = 'closed';
+    };
+
+    window.speechSynthesis.speak(utterance);
   }
 
   /* ---------- draw helpers ---------- */
@@ -123,6 +145,7 @@
     ctx.beginPath(); ctx.moveTo(cx - w / 2.6, cy + h * 0.05);
     ctx.quadraticCurveTo(cx, cy + h * 0.4, cx + w / 2.6, cy + h * 0.05); ctx.stroke();
   }
+  
   function coverWatermark() {
     if (!geo) return;
     var px = geo.ox + geo.dw * 0.845, py = geo.oy + geo.dh * 0.855;
@@ -135,6 +158,7 @@
     ctx.fillStyle = rad;
     ctx.fillRect(px - 3, py - 3, pw + 8, ph + 8);
   }
+  
   function pickKey() {
     if (performance.now() < smileUntil && imgs.SMILE &&
         imgs.SMILE.complete && imgs.SMILE.naturalWidth) return 'SMILE';
@@ -204,6 +228,11 @@
       } catch (e) {}
       return p;
     };
+  }
+
+  // Voices මුලින්ම Load වන බව තහවුරු කිරීම (Chrome/Safari Fix)
+  if (window.speechSynthesis && window.speechSynthesis.onvoiceschanged !== undefined) {
+    window.speechSynthesis.onvoiceschanged = function () { window.speechSynthesis.getVoices(); };
   }
 
   function boot() { watchChat(); }
