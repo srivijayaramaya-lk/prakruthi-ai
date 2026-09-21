@@ -1,8 +1,10 @@
-/* =========================================================================
-   pk_avatar.js — v1.12 "ප්‍රකෘති මුහුණ" (Perfect Audio File Lip-Sync)
-   Owner's pencil-sketch portrait, real mouth layers synchronized with Audio.
-   100% Guaranteed Sound-to-Mouth matching using Web Audio Analyser.
-   ========================================================================= */
+/* =========================================================
+   pk_avatar.js — v1.10 "ප්‍රකෘති මුහුණ" (Layered Sketch Face)
+   Owner's pencil-sketch portrait, real mouth layers:
+   mouth_a/o/i.png (talk) + mouth_smile.png (smile).
+   Classic 2D swap + breathing + blinking + click-to-enlarge.
+   Self-contained fetch wrapper, no libraries.
+   ========================================================= */
 (function () {
   if (window.PKFace) return;
 
@@ -37,29 +39,12 @@
     e.stopPropagation();
     wrap.classList.toggle('big');
   });
-
-  /* ---------- 🔊 AUDIO LOGIC SETUP ---------- */
-  // ඔබ සතු පිරිසිදු කටහඬ ගොනුව (Audio File) මෙතැනට දමන්න
-  var audio = new Audio('/clean_voice.mp3?v=2'); 
-  var audioCtx = null, analyser = null, dataArray = null, audioSetup = false;
-
-  function initAudioTracking() {
-    if (audioSetup) return;
-    try {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      var source = audioCtx.createMediaElementSource(audio);
-      analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 64; // කුඩා අගයක් මඟින් වේගවත් ප්‍රතිචාර ලැබේ
-      var bufferLength = analyser.frequencyBinCount;
-      dataArray = new Uint8Array(bufferLength);
-      source.connect(analyser);
-      analyser.connect(audioCtx.destination);
-      audioSetup = true;
-    } catch (e) { console.error("Audio Context Error:", e); }
-  }
+   wrap.addEventListener('click', function () {
+    if (wrap.classList.contains('big')) wrap.classList.remove('big');
+  });
 
   /* ---------- layered images ---------- */
-  var files = {
+    var files = {
     closed: '/face_base.png?v=2', A: '/mouth_a.png?v=2', O: '/mouth_o.png?v=2',
     E: '/mouth_i.png?v=2', SMILE: '/mouth_smile.png?v=2'
   };
@@ -70,7 +55,6 @@
     im.onload = function () { loaded++; done(); };
     im.onerror = function () { done(); };
   });
-  
   function countOk() {
     var n = 0;
     Object.keys(imgs).forEach(function (k) {
@@ -78,6 +62,10 @@
     });
     return n;
   }
+  if (!imgs.closed.complete) {
+    imgs.closed.onload = (function (orig) { return function () { orig(); }; })(imgs.closed.onload);
+  }
+  imgs.closed.onerror = function () { wrap.style.display = 'none'; };
 
   var geo = null;
   var blinkUntil = 0;
@@ -86,21 +74,44 @@
       2600 + Math.random() * 3400);
   })();
 
+  /* ---------- visemes ---------- */
+  function visemeFor(ch) {
+    if (ch === ' ' || '.,!?;:—'.indexOf(ch) >= 0) return 'closed';
+    ch = ch.toUpperCase();
+    if ('අආඇඈාැඓA'.indexOf(ch) >= 0) return 'A';
+    if ('ඔඕඋඌූොෝෞOUW'.indexOf(ch) >= 0) return 'O';
+    if ('ඉඊිීඑඒෙේෛEIY'.indexOf(ch) >= 0) return 'E';
+    return 'M';
+  }
+
   var busy = false;
-  var liveViseme = 'closed';
+  var speak = { active: false, viseme: 'closed', timer: null };
   var smileUntil = 0;
-  
   function smile(ms) { smileUntil = performance.now() + (ms || 2000); }
   function setBusy(v) { busy = !!v; }
 
-  // 🎯 පිටතින් Text එකක් ආ විට Audio File එක ධාවනය කිරීම
   function speakSnippet(text) {
-    if (audioCtx && audioCtx.state === 'suspended') {
-      audioCtx.resume();
-    }
-    initAudioTracking();
-    audio.currentTime = 0;
-    audio.play().catch(function(e){ console.log("Audio play blocked:", e); });
+    text = String(text || '').replace(/[*#`>_[\]()~]/g, '');
+    text = text.split('https://')[0];
+    text = text.replace(/\s+/g, ' ').trim().slice(0, 60);
+    if (!text) { smile(2000); return; }
+    clearTimeout(speak.timer);
+    var chars = text.split(''); var i = 0; speak.active = true;
+    var step = function () {
+      if (i >= chars.length) {
+        speak.active = false; speak.viseme = 'closed';
+        smile(2200); return;
+      }
+      var ch = chars[i++];
+      speak.viseme = visemeFor(ch);
+      var d;
+      if (speak.viseme === 'closed') {
+        d = ('.,!?;:—'.indexOf(ch) >= 0) ? 180 + Math.random() * 70 : 75 + Math.random() * 35;
+      } else if (speak.viseme === 'M') { d = 95 + Math.random() * 30; }
+      else { d = 140 + Math.random() * 55; }
+      speak.timer = setTimeout(step, d);
+    };
+    step();
   }
 
   /* ---------- draw helpers ---------- */
@@ -112,7 +123,6 @@
     ctx.beginPath(); ctx.moveTo(cx - w / 2.6, cy + h * 0.05);
     ctx.quadraticCurveTo(cx, cy + h * 0.4, cx + w / 2.6, cy + h * 0.05); ctx.stroke();
   }
-  
   function coverWatermark() {
     if (!geo) return;
     var px = geo.ox + geo.dw * 0.845, py = geo.oy + geo.dh * 0.855;
@@ -125,35 +135,18 @@
     ctx.fillStyle = rad;
     ctx.fillRect(px - 3, py - 3, pw + 8, ph + 8);
   }
-  
   function pickKey() {
     if (performance.now() < smileUntil && imgs.SMILE &&
         imgs.SMILE.complete && imgs.SMILE.naturalWidth) return 'SMILE';
-    
-    // ශබ්දය නැතිනම් කට වසා තබයි
-    if (audio.paused || audio.ended) return 'closed';
-    
-    return liveViseme;
+    var v = speak.viseme;
+    var k = (v === 'A' || v === 'O' || v === 'E') ? v : 'closed';
+    if (!(imgs[k] && imgs[k].complete && imgs[k].naturalWidth)) k = 'closed';
+    return k;
   }
 
   /* ---------- loop ---------- */
   function loop(t) {
     ctx.clearRect(0, 0, W, H);
-    
-    // 🎯 සැබෑ හඬ තරංග විශ්ලේෂණය කර කටේ පින්තූර මාරු කිරීම
-    if (audioSetup && !audio.paused) {
-      analyser.getByteFrequencyData(dataArray);
-      var total = 0;
-      for (var i = 0; i < dataArray.length; i++) { total += dataArray[i]; }
-      var vol = total / dataArray.length; // සැබෑ ශබ්ද මට්ටම (0-255)
-
-      // හඬෙහි උස් පහත් වීම් අනුව පින්තූර (Visemes) මාරු කිරීම
-      if (vol < 5) { liveViseme = 'closed'; }
-      else if (vol >= 5 && vol < 45) { liveViseme = 'E'; }  // සියුම් ශබ්ද (ඉ)
-      else if (vol >= 45 && vol < 85) { liveViseme = 'O'; } // මධ්‍යම ශබ්ද (ඔ)
-      else { liveViseme = 'A'; }                            // උස් ශබ්ද (ආ)
-    }
-
     if (imgs.closed && imgs.closed.complete && imgs.closed.naturalWidth) {
       if (!geo) {
         var b = imgs.closed;
@@ -162,7 +155,7 @@
         geo.ox = (W - geo.dw) / 2; geo.oy = (H - geo.dh) / 2;
       }
       var im = imgs[pickKey()];
-      var acting = (!audio.paused && !audio.ended) || busy;
+      var acting = speak.active || busy;
       var bobX = acting ? Math.sin(t / 470) * 0.35 : 0;
       var bobY = acting ? Math.sin(t / 320) * 0.45 : 0;
       var br = 1 + 0.012 * Math.sin(t / 750);
@@ -212,9 +205,6 @@
       return p;
     };
   }
-
-  // පළමු ක්ලික් කිරීමේදී හෝ ස්පර්ශයේදී Audio Context එක බලගැන්වීම (Browser Blocks වලක්වාලීමට)
-  document.addEventListener('click', function() { if(audioCtx) audioCtx.resume(); }, { once: true });
 
   function boot() { watchChat(); }
   if (document.readyState === 'loading') {
