@@ -379,7 +379,7 @@ if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").cat
 </script>
 <script src="/pk_features.js"></script>
 <script src="/pk_v12.js"></script>
-<script src="/pk_avatar.js?v=3"></script>
+<script src="/pk_avatar.js?v=4"></script>
 </body>
 </html>"""
 

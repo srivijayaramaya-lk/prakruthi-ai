@@ -1,9 +1,10 @@
 /* =========================================================
-   pk_avatar.js — v1.10 "ප්‍රකෘති මුහුණ" (Layered Sketch Face)
-   Owner's pencil-sketch portrait, real mouth layers:
-   mouth_a/o/i.png (talk) + mouth_smile.png (smile).
-   Classic 2D swap + breathing + blinking + click-to-enlarge.
-   Self-contained fetch wrapper, no libraries.
+   pk_avatar.js — v1.11 "ප්‍රකෘති මුහුණ" (Real-Voice Lip-Sync)
+   Layered sketch face + REAL TTS sync via onboundary events.
+   Voice ON  → TTS speaks, mouth follows actual speech
+               (fallback timer for phones without boundary events).
+   Voice OFF → silent mouth animation (as before).
+   Male voice (pitch 0.7). Self-contained. No libraries.
    ========================================================= */
 (function () {
   if (window.PKFace) return;
@@ -34,37 +35,22 @@
   document.body.appendChild(wrap);
   var ctx = cv.getContext('2d');
 
-  /* click → enlarge / close */
   cv.addEventListener('click', function (e) {
     e.stopPropagation();
     wrap.classList.toggle('big');
   });
-   wrap.addEventListener('click', function () {
-    if (wrap.classList.contains('big')) wrap.classList.remove('big');
-  });
 
   /* ---------- layered images ---------- */
-    var files = {
+  var files = {
     closed: '/face_base.png?v=2', A: '/mouth_a.png?v=2', O: '/mouth_o.png?v=2',
     E: '/mouth_i.png?v=2', SMILE: '/mouth_smile.png?v=2'
   };
-  var imgs = {}, loaded = 0, arrived = 0;
+  var imgs = {}, arrived = 0;
   Object.keys(files).forEach(function (k) {
     var im = new Image(); im.src = files[k]; imgs[k] = im;
-    var done = function () { arrived++; if (arrived === 5) { loaded = countOk(); } };
-    im.onload = function () { loaded++; done(); };
-    im.onerror = function () { done(); };
+    im.onload = function () { arrived++; };
+    im.onerror = function () { arrived++; };
   });
-  function countOk() {
-    var n = 0;
-    Object.keys(imgs).forEach(function (k) {
-      if (imgs[k].complete && imgs[k].naturalWidth) n++;
-    });
-    return n;
-  }
-  if (!imgs.closed.complete) {
-    imgs.closed.onload = (function (orig) { return function () { orig(); }; })(imgs.closed.onload);
-  }
   imgs.closed.onerror = function () { wrap.style.display = 'none'; };
 
   var geo = null;
@@ -74,9 +60,9 @@
       2600 + Math.random() * 3400);
   })();
 
-  /* ---------- visemes ---------- */
+  /* ---------- phonetics ---------- */
   function visemeFor(ch) {
-    if (ch === ' ' || '.,!?;:—'.indexOf(ch) >= 0) return 'closed';
+    if (!ch || ch === ' ' || '.,!?;:—'.indexOf(ch) >= 0) return 'closed';
     ch = ch.toUpperCase();
     if ('අආඇඈාැඓA'.indexOf(ch) >= 0) return 'A';
     if ('ඔඕඋඌූොෝෞOUW'.indexOf(ch) >= 0) return 'O';
@@ -85,17 +71,26 @@
   }
 
   var busy = false;
-  var speak = { active: false, viseme: 'closed', timer: null };
+  var speak = { active: false, viseme: 'closed' };
   var smileUntil = 0;
+  var talkTimer = null;      /* silent-mode timer */
+  var fallbackTimer = null;  /* TTS no-boundary fallback */
+  var boundaryFired = false;
+
   function smile(ms) { smileUntil = performance.now() + (ms || 2000); }
   function setBusy(v) { busy = !!v; }
 
-  function speakSnippet(text) {
-    text = String(text || '').replace(/[*#`>_[\]()~]/g, '');
-    text = text.split('https://')[0];
-    text = text.replace(/\s+/g, ' ').trim().slice(0, 60);
-    if (!text) { smile(2000); return; }
-    clearTimeout(speak.timer);
+  /* voice toggle state (pk_v12.js exposes window.pkVoiceOn) */
+  function voiceOn() {
+    try {
+      if (typeof window.pkVoiceOn === 'function') return !!window.pkVoiceOn();
+    } catch (e) {}
+    return false; /* unknown → silent animation (safe default) */
+  }
+
+  /* ---------- silent animation path (voice OFF) ---------- */
+  function silentTalk(text) {
+    clearTimeout(talkTimer);
     var chars = text.split(''); var i = 0; speak.active = true;
     var step = function () {
       if (i >= chars.length) {
@@ -109,9 +104,73 @@
         d = ('.,!?;:—'.indexOf(ch) >= 0) ? 180 + Math.random() * 70 : 75 + Math.random() * 35;
       } else if (speak.viseme === 'M') { d = 95 + Math.random() * 30; }
       else { d = 140 + Math.random() * 55; }
-      speak.timer = setTimeout(step, d);
+      talkTimer = setTimeout(step, d);
     };
     step();
+  }
+
+  /* ---------- REAL VOICE path (voice ON) ---------- */
+  function startFallback(text) {
+    boundaryFired = false;
+    var idx = 0;
+    fallbackTimer = setInterval(function () {
+      if (!speak.active || boundaryFired) { clearInterval(fallbackTimer); return; }
+      var ch = text.charAt(idx % Math.max(text.length, 1));
+      idx++;
+      speak.viseme = visemeFor(ch);
+    }, 115);
+  }
+
+  function ttsTalk(text) {
+    try { window.speechSynthesis.cancel(); } catch (e) {}
+    var u = new SpeechSynthesisUtterance(text);
+
+    /* voice preference: sinhala if exists, else default */
+    try {
+      var voices = window.speechSynthesis.getVoices() || [];
+      var sv = null;
+      for (var i = 0; i < voices.length; i++) {
+        if (String(voices[i].lang).toLowerCase().indexOf('si') === 0) { sv = voices[i]; break; }
+      }
+      if (sv) u.voice = sv;
+    } catch (e) {}
+
+    u.rate = 0.95;
+    u.pitch = 0.7;   /* පිරිමි හඬ (owner decision) — 0.8/0.9 if too deep */
+
+    u.onstart = function () {
+      speak.active = true; speak.viseme = 'closed';
+      startFallback(text); /* boundary නොඑන phones වලට fallback */
+    };
+    u.onboundary = function (ev) {
+      if (typeof ev.charIndex !== 'number') return;
+      if (!boundaryFired) { boundaryFired = true; clearInterval(fallbackTimer); }
+      var ch = text.charAt(ev.charIndex);
+      speak.viseme = visemeFor(ch);
+    };
+    u.onend = function () {
+      speak.active = false; speak.viseme = 'closed';
+      clearInterval(fallbackTimer);
+      smile(2200);
+    };
+    u.onerror = function () {
+      speak.active = false; speak.viseme = 'closed';
+      clearInterval(fallbackTimer);
+    };
+    window.speechSynthesis.speak(u);
+  }
+
+  function speakSnippet(text) {
+    text = String(text || '').replace(/[*#`>_[\]()~]/g, '');
+    text = text.split('https://')[0];
+    text = text.replace(/\s+/g, ' ').trim();
+    if (!text) { smile(2000); return; }
+
+    if ('speechSynthesis' in window && voiceOn()) {
+      ttsTalk(text);          /* හඬ ON → ඇත්ත හඬට කට sync */
+    } else {
+      silentTalk(text);       /* හඬ OFF → නිහඬ animation */
+    }
   }
 
   /* ---------- draw helpers ---------- */
@@ -204,6 +263,10 @@
       } catch (e) {}
       return p;
     };
+  }
+
+  if (window.speechSynthesis && window.speechSynthesis.onvoiceschanged !== undefined) {
+    window.speechSynthesis.onvoiceschanged = function () { window.speechSynthesis.getVoices(); };
   }
 
   function boot() { watchChat(); }
