@@ -130,6 +130,7 @@
             if (cur) chunks.push(cur);
 
             var ci = 0;
+            var lastStart = 0;
             var next = function () {
                 if (ci >= chunks.length) return;
                 var u = new SpeechSynthesisUtterance(chunks[ci++]);
@@ -137,11 +138,18 @@
                 if (v) u.voice = v;
                 u.lang = v ? v.lang : "si-LK";
                 u.rate = 0.95; u.pitch = 0.7;
-                u.onend = function () { setTimeout(next, 60); };
-                u.onerror = function () { setTimeout(next, 60); };
+                lastStart = Date.now();
+                u.onend = function () { setTimeout(next, 250); };    /* 60→250: re-speak race fix */
+                u.onerror = function () { setTimeout(next, 250); };
                 speechSynthesis.speak(u);
+                /* chunk watchdog: silent-death fix — 8s ඇතුළත onend/onerror නැත්නම් force next */
+                setTimeout(function () {
+                    if (Date.now() - lastStart < 8000) return; /* still speaking */
+                    speechSynthesis.cancel();
+                    setTimeout(next, 250);
+                }, 8200);
             };
-            setTimeout(next, 180); /* cancel() race fix */
+            setTimeout(next, 180);
         } catch (e) {}
     }
   function stopSpeak() {
