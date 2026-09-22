@@ -137,10 +137,23 @@
     } catch (e) {}
 
     u.rate = 0.95;
+    
+        /* silent-TTS watchdog: audio never starts → fall back to silent talk */
+    var audioStarted = false;
+    u.onvoice = function () { audioStarted = true; };
+    setTimeout(function () {
+      if (!audioStarted && speak.active) {
+        clearInterval(fallbackTimer);
+        speak.active = false; speak.viseme = 'closed';
+        silentTalk(text);
+      }
+    }, 1200);
+
     u.pitch = 0.7;   /* පිරිමි හඬ (owner decision) — 0.8/0.9 if too deep */
 
     u.onstart = function () {
       speak.active = true; speak.viseme = 'closed';
+      audioStarted = true;
       startFallback(text); /* boundary නොඑන phones වලට fallback */
     };
     u.onboundary = function (ev) {
