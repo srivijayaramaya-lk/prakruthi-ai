@@ -167,6 +167,12 @@ future session tuning the face should read this first and report changes.
 - [OPEN] Talking feel: owner observing speed/length/shapes — results pending
 - [OPEN] "යවන්න" button hidden on phones (both) — needs phone screenshot
   of that screen to fix layout
+  
+  - [WATCH] TTS voice on PC Chrome is silent (no working Sinhala voice on
+  that system) → v1.11.2 watchdog falls back to silent animation
+  (verified). Voice plays only on devices with a working Sinhala TTS
+  voice. Voice ON/OFF toggle respected either way.
+  
 - [WATCH] Occasional garbled first line in a reply (possible Gemini
   hiccup) — only if it repeats
 - [FIXED v1.10.x] green bands pulsing (cover fit), mouth not moving on
