@@ -105,8 +105,7 @@
     siVoice = pickVoice();
     if (!siVoice) speechSynthesis.onvoiceschanged = function () { siVoice = pickVoice(); };
   }
-  function speak(text) {
-    if (window.PKFace) return; /* v1.11: face handles all speech */
+   function speak(text) { /* v1.11: face handles all speech */
     if (!voiceOn() || !("speechSynthesis" in window) || !text) return;
     try {
       speechSynthesis.cancel();

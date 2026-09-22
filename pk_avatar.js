@@ -180,11 +180,7 @@
     text = text.replace(/\s+/g, ' ').trim();
     if (!text) { smile(2000); return; }
 
-    if ('speechSynthesis' in window && voiceOn()) {
-      ttsTalk(text);          /* හඬ ON → ඇත්ත හඬට කට sync */
-    } else {
-      silentTalk(text);       /* හඬ OFF → නිහඬ animation */
-    }
+    silentTalk(text); /* v1.12: හඬ pk_v12 එකෙන් (voice ON); කට animation සැමවිටම මෙතනින් */
   }
 
   /* ---------- draw helpers ---------- */
