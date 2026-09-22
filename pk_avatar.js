@@ -85,6 +85,7 @@
     try {
       if (typeof window.pkVoiceOn === 'function') return !!window.pkVoiceOn();
     } catch (e) {}
+    try { return localStorage.getItem('pk_voice') === '1'; } catch (e) {}
     return false; /* unknown → silent animation (safe default) */
   }
 
