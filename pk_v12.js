@@ -105,28 +105,51 @@
     siVoice = pickVoice();
     if (!siVoice) speechSynthesis.onvoiceschanged = function () { siVoice = pickVoice(); };
   }
-   function speak(text) { /* v1.11: face handles all speech */
-    if (!voiceOn() || !("speechSynthesis" in window) || !text) return;
-    try {
-      speechSynthesis.cancel();
-      var clean = (text || "")
-        .replace(/\*+/g, " ")
-        .replace(/[#_`~>|]+/g, " ")
-        .replace(/[\u2190-\u21FF\u2600-\u27BF\uFE0F]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
-      var u = new SpeechSynthesisUtterance(clean);
-      var v = siVoice || pickVoice();
-      if (v) u.voice = v;
-      u.lang = v ? v.lang : "si-LK";
-      u.rate = 0.95; u.pitch = 0.7;
-      speechSynthesis.speak(u);
-    } catch (e) {}
-  }
+   function speak(text) {
+        if (!voiceOn() || !("speechSynthesis" in window) || !text) return;
+        try {
+            speechSynthesis.cancel();
+            var clean = (text || "")
+                .replace(/\*+/g, " ")
+                .replace(/[#`~>|]+/g, " ")
+                .replace(/[\u2190-\u21FF\u2600-\u27BF\uFE0F]/g, " ")
+                .replace(/\s+/g, " ")
+                .trim();
+
+            /* v1.12: කට animation — face එකට call (approx sync) */
+            try { if (window.PKFace && PKFace.animate) PKFace.animate(clean); } catch (e) {}
+
+            /* v1.12: chunked sequential speech — දිග text cut-off fix */
+            var words = clean.split(" ");
+            var chunks = [], cur = "";
+            for (var i = 0; i < words.length; i++) {
+                var t2 = cur ? cur + " " + words[i] : words[i];
+                if (t2.length > 80 && cur) { chunks.push(cur); cur = words[i]; }
+                else { cur = t2; }
+            }
+            if (cur) chunks.push(cur);
+
+            var ci = 0;
+            var next = function () {
+                if (ci >= chunks.length) return;
+                var u = new SpeechSynthesisUtterance(chunks[ci++]);
+                var v = siVoice || pickVoice();
+                if (v) u.voice = v;
+                u.lang = v ? v.lang : "si-LK";
+                u.rate = 0.95; u.pitch = 0.7;
+                u.onend = function () { setTimeout(next, 60); };
+                u.onerror = function () { setTimeout(next, 60); };
+                speechSynthesis.speak(u);
+            };
+            setTimeout(next, 180); /* cancel() race fix */
+        } catch (e) {}
+    }
   function stopSpeak() {
     try { if ("speechSynthesis" in window) speechSynthesis.cancel(); } catch (e) {}
   }
   loadVoice();
+
+  window.pkSpeak = speak;
 
   /* ---------- 📷 camera + memory ---------- */
   function chatInput() {

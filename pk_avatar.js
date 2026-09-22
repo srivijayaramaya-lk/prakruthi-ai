@@ -1,10 +1,11 @@
 /* =========================================================
-   pk_avatar.js — v1.11 "ප්‍රකෘති මුහුණ" (Real-Voice Lip-Sync)
-   Layered sketch face + REAL TTS sync via onboundary events.
-   Voice ON  → TTS speaks, mouth follows actual speech
-               (fallback timer for phones without boundary events).
-   Voice OFF → silent mouth animation (as before).
-   Male voice (pitch 0.7). Self-contained. No libraries.
+   pk_avatar.js — v1.13 "ප්‍රකෘති මුහුණ" (Single-Speaker Final)
+   Layered sketch face: breathing + blinking + real mouth layers
+   + smile + click enlarge + watermark cover.
+   Voice: pk_v12.js handles ALL speech (chunked, male pitch 0.7)
+   and calls PKFace.animate() for mouth sync.
+   Voice OFF → silent mouth animation here.
+   Single speaker — no cancel wars.
    ========================================================= */
 (function () {
   if (window.PKFace) return;
@@ -42,8 +43,8 @@
 
   /* ---------- layered images ---------- */
   var files = {
-    closed: '/face_base.png?v=2', A: '/mouth_a.png?v=2', O: '/mouth_o.png?v=2',
-    E: '/mouth_i.png?v=2', SMILE: '/mouth_smile.png?v=2'
+    closed: '/face_base.png?v=4', A: '/mouth_a.png?v=4', O: '/mouth_o.png?v=4',
+    E: '/mouth_i.png?v=4', SMILE: '/mouth_smile.png?v=4'
   };
   var imgs = {}, arrived = 0;
   Object.keys(files).forEach(function (k) {
@@ -73,23 +74,18 @@
   var busy = false;
   var speak = { active: false, viseme: 'closed' };
   var smileUntil = 0;
-  var talkTimer = null;      /* silent-mode timer */
-  var fallbackTimer = null;  /* TTS no-boundary fallback */
-  var boundaryFired = false;
+  var talkTimer = null;
 
   function smile(ms) { smileUntil = performance.now() + (ms || 2000); }
   function setBusy(v) { busy = !!v; }
 
-  /* voice toggle state (pk_v12.js exposes window.pkVoiceOn) */
+  /* voice toggle: pk_voice key (pk_v12 toggle එකම) */
   function voiceOn() {
-    try {
-      if (typeof window.pkVoiceOn === 'function') return !!window.pkVoiceOn();
-    } catch (e) {}
     try { return localStorage.getItem('pk_voice') === '1'; } catch (e) {}
-    return false; /* unknown → silent animation (safe default) */
+    return false;
   }
 
-  /* ---------- silent animation path (voice OFF) ---------- */
+  /* ---------- mouth animation (used for BOTH paths) ---------- */
   function silentTalk(text) {
     clearTimeout(talkTimer);
     var chars = text.split(''); var i = 0; speak.active = true;
@@ -110,77 +106,20 @@
     step();
   }
 
-  /* ---------- REAL VOICE path (voice ON) ---------- */
-  function startFallback(text) {
-    boundaryFired = false;
-    var idx = 0;
-    fallbackTimer = setInterval(function () {
-      if (!speak.active || boundaryFired) { clearInterval(fallbackTimer); return; }
-      var ch = text.charAt(idx % Math.max(text.length, 1));
-      idx++;
-      speak.viseme = visemeFor(ch);
-    }, 115);
-  }
-
-  function ttsTalk(text) {
-    try { window.speechSynthesis.cancel(); } catch (e) {}
-    var u = new SpeechSynthesisUtterance(text);
-
-    /* voice preference: sinhala if exists, else default */
-    try {
-      var voices = window.speechSynthesis.getVoices() || [];
-      var sv = null;
-      for (var i = 0; i < voices.length; i++) {
-        if (String(voices[i].lang).toLowerCase().indexOf('si') === 0) { sv = voices[i]; break; }
-      }
-      if (sv) u.voice = sv;
-    } catch (e) {}
-
-    u.rate = 0.95;
-    
-        /* silent-TTS watchdog: audio never starts → fall back to silent talk */
-    var audioStarted = false;
-    u.onvoice = function () { audioStarted = true; };
-    setTimeout(function () {
-      if (!audioStarted && speak.active) {
-        clearInterval(fallbackTimer);
-        speak.active = false; speak.viseme = 'closed';
-        silentTalk(text);
-      }
-    }, 1200);
-
-    u.pitch = 0.7;   /* පිරිමි හඬ (owner decision) — 0.8/0.9 if too deep */
-
-    u.onstart = function () {
-      speak.active = true; speak.viseme = 'closed';
-      audioStarted = true;
-      startFallback(text); /* boundary නොඑන phones වලට fallback */
-    };
-    u.onboundary = function (ev) {
-      if (typeof ev.charIndex !== 'number') return;
-      if (!boundaryFired) { boundaryFired = true; clearInterval(fallbackTimer); }
-      var ch = text.charAt(ev.charIndex);
-      speak.viseme = visemeFor(ch);
-    };
-    u.onend = function () {
-      speak.active = false; speak.viseme = 'closed';
-      clearInterval(fallbackTimer);
-      smile(2200);
-    };
-    u.onerror = function () {
-      speak.active = false; speak.viseme = 'closed';
-      clearInterval(fallbackTimer);
-    };
-    window.speechSynthesis.speak(u);
-  }
-
+  /* ---------- single entry: chat reply → face ---------- */
   function speakSnippet(text) {
     text = String(text || '').replace(/[*#`>_[\]()~]/g, '');
     text = text.split('https://')[0];
     text = text.replace(/\s+/g, ' ').trim();
     if (!text) { smile(2000); return; }
 
-    silentTalk(text); /* v1.12: හඬ pk_v12 එකෙන් (voice ON); කට animation සැමවිටම මෙතනින් */
+    /* voice ON → pk_v12 හඬ කතා කරලා එයාම PKFace.animate() call කරනවා */
+    if (voiceOn() && typeof window.pkSpeak === 'function') {
+      window.pkSpeak(text);
+      return;
+    }
+    /* voice OFF (හෝ pkSpeak නැත්නම්) → නිහඬ animation */
+    silentTalk(text);
   }
 
   /* ---------- draw helpers ---------- */
@@ -213,7 +152,7 @@
     return k;
   }
 
-  /* ---------- loop ---------- */
+  /* ---------- loop (COVER fit + breathing + bob) ---------- */
   function loop(t) {
     ctx.clearRect(0, 0, W, H);
     if (imgs.closed && imgs.closed.complete && imgs.closed.naturalWidth) {
@@ -275,14 +214,10 @@
     };
   }
 
-  if (window.speechSynthesis && window.speechSynthesis.onvoiceschanged !== undefined) {
-    window.speechSynthesis.onvoiceschanged = function () { window.speechSynthesis.getVoices(); };
-  }
-
   function boot() { watchChat(); }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);
   } else { boot(); }
 
-  window.PKFace = { smile: smile, speak: speakSnippet };
+  window.PKFace = { smile: smile, speak: speakSnippet, setBusy: setBusy, animate: silentTalk };
 })();

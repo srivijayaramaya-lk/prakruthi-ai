@@ -132,6 +132,18 @@ deep verification.
 - IDEA-5: smile could become sentiment-driven later (dhamma answers =
   gentle smile only, etc.)
 
+  - IDEA-6: Google Cloud TTS si-LK voice — real Sinhala speech for replies
+  (server-side API call, free tier covers small usage). Would fix the
+  English-voice-reading-Sinhala problem on all devices. Owner decision
+  later (needs API key setup).
+
+  - NOTE (2026-09-22): TTS silent issue RESOLVED — root cause was STALE
+  CACHE serving the old pk_v12.js (blocked copy). Cache-bust v2 restored
+  voice on PC Chrome AND Android (verified). Devices have no Sinhala TTS
+  voice installed → default English voice reads Sinhala text (poor
+  pronunciation, "half working" feel). English text reads clean.
+  Device-level limitation, not app bug. IDEA-6 above would fix this.
+
 ## 8c. FACE TUNING GUIDE (pk_avatar.js — all knobs in ONE file)
 Goal: owner wants the face posture/expression improved over time. Any
 future session tuning the face should read this first and report changes.
@@ -168,10 +180,12 @@ future session tuning the face should read this first and report changes.
 - [OPEN] "යවන්න" button hidden on phones (both) — needs phone screenshot
   of that screen to fix layout
   
-  - [WATCH] TTS voice on PC Chrome is silent (no working Sinhala voice on
-  that system) → v1.11.2 watchdog falls back to silent animation
-  (verified). Voice plays only on devices with a working Sinhala TTS
-  voice. Voice ON/OFF toggle respected either way.
+ - [RESOLVED v1.12.2] TTS voice silent — root cause was STALE CACHE
+  serving old pk_v12.js (blocked copy). Cache-bust v2 restored voice on
+  PC Chrome AND Android (verified). Devices have no Sinhala TTS voice
+  installed → default English voice reads Sinhala text (poor
+  pronunciation); English text reads clean. Fix: IDEA-6 (Google Cloud
+  TTS) for real Sinhala speech.
   
 - [WATCH] Occasional garbled first line in a reply (possible Gemini
   hiccup) — only if it repeats
